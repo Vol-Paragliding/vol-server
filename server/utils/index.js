@@ -65,9 +65,23 @@ const signupHandler = async (err, result, res) => {
     }
     const { username, userId } = result;
     const feedClient = connect(api_key, api_secret, app_id, {
-        location: "eu-west",
+        location: "us-east",
     });
-    const chatClient = StreamChat.getInstance(api_key, api_secret); //, location = "eu-west");
+
+    const user = feedClient.user(userId).create({
+        name: username,
+    });
+    const userFeed = feedClient.feed("user", userId);
+    await userFeed.addActivity({
+      actor: userId,
+      verb: "signup",
+      object: "user",
+    });
+
+    const timelineFeed = feedClient.feed("timeline", userId);
+    const notificationFeed = feedClient.feed("notification", userId);
+
+    const chatClient = StreamChat.getInstance(api_key, api_secret); //, location = "us-east");
     chatClient.upsertUser({
         id: userId,
         username: username,
@@ -86,9 +100,10 @@ const loginHandler = async (error, result, res) => {
     }
     const { username, id } = result;
     const feedClient = connect(api_key, api_secret, app_id, {
-        location: "eu-west",
+        location: "us-east",
     });
-    const chatClient = StreamChat.getInstance(api_key, api_secret); //, location="eu-west"
+
+    const chatClient = StreamChat.getInstance(api_key, api_secret); //, location="us-east"
     const { users } = await chatClient.queryUsers({
         username: { $eq: username },
     });
@@ -116,7 +131,7 @@ const searchUsersHandler = async (err, result, res) => {
     }
     res.status(200).json({ results: result });
 };
-    
+
 
 
 module.exports = { verifyUser, loginHandler, registerUser, signupHandler, searchUsersHandler, searchUsers };
