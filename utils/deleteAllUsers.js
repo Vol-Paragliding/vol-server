@@ -83,7 +83,15 @@ const deleteAllUsers = async () => {
   }
 };
 
-// Call the deleteAllUsers function to start the process
-deleteAllUsers();
+// deleteAllUsers();
+// GET all users
+getAllUsers((err, userIds) => {
+  if (err) {
+    console.error("Error fetching users from the database:", err);
+    return;
+  }
+
+  console.log("All users except zacheryconverse:", userIds);
+});
 
 module.exports = { deleteAllUsers };

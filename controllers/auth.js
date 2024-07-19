@@ -8,6 +8,7 @@ const {
     verifyUser,
     searchUsers,
     searchUsersHandler,
+    deleteUser,
 } = require("../utils");
 
 const signup = async (req, res) => {
@@ -50,4 +51,4 @@ const users = async (req, res) => {
     }
 };
 
-module.exports = { signup, login, users };
+module.exports = { signup, login, users, deleteUser };
