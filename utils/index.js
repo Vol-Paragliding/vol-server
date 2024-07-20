@@ -251,6 +251,89 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const googleAuthCallback = async (accessToken, refreshToken, profile, done) => {
+  const lowercasedUsername = profile.emails[0].value.toLowerCase();
+  const lowercasedUserId = profile.id.toLowerCase();
+
+  const feedClient = connect(api_key, api_secret, app_id, {
+    location: "us-east",
+  });
+
+  try {
+    const chatClient = StreamChat.getInstance(api_key, api_secret);
+    let userExists = false;
+
+    const existingUser = await new Promise((resolve, reject) => {
+      db.get(
+        "SELECT * FROM users WHERE id = ?",
+        [lowercasedUserId],
+        function (err, row) {
+          if (err) return reject(err);
+          if (row) {
+            userExists = true;
+            resolve(row);
+          } else {
+            resolve(null);
+          }
+        }
+      );
+    });
+
+    if (!userExists) {
+      await new Promise((resolve, reject) => {
+        registerUser(
+          lowercasedUserId,
+          lowercasedUsername,
+          null,
+          (err, user) => {
+            if (err) return reject(err);
+            resolve(user);
+          }
+        );
+      });
+
+      await chatClient.upsertUser({
+        id: lowercasedUserId,
+        username: lowercasedUsername,
+      });
+
+      const user = await feedClient.user(lowercasedUserId).create({
+        name: lowercasedUsername,
+        id: lowercasedUserId,
+      });
+
+      const userFeed = feedClient.feed("user", lowercasedUserId);
+      await userFeed.addActivity({
+        actor: user,
+        verb: "signup",
+        object: `${user.id} has signed up! 🎉🎉🎉`,
+        text: `${user.id} has signed up! 🎉🎉🎉`,
+      });
+
+      const timelineFeed = feedClient.feed("timeline", lowercasedUserId);
+      await timelineFeed.follow("user", lowercasedUserId);
+      const notificationFeed = feedClient.feed(
+        "notification",
+        lowercasedUserId
+      );
+    }
+
+    const feedToken = feedClient.createUserToken(lowercasedUserId);
+    const chatToken = chatClient.createToken(lowercasedUserId);
+
+    return done(null, {
+      profile,
+      feedToken,
+      chatToken,
+      username: lowercasedUsername,
+      userId: lowercasedUserId,
+    });
+  } catch (error) {
+    console.error(error.message);
+    return done(error);
+  }
+};
+
 module.exports = {
   verifyUser,
   loginHandler,
@@ -259,4 +342,5 @@ module.exports = {
   searchUsersHandler,
   searchUsers,
   deleteUser,
+  googleAuthCallback,
 };
