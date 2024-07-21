@@ -68,8 +68,8 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
 
     if (user) {
       const id = user.id;
-      const userId = googleId;
-      const username = user.username || googleId;
+      const userId = user.userId;
+      const username = user.username;
 
       try {
         await loginHandler(null, { username, id, userId, name }, res);
@@ -80,7 +80,7 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
     } else {
       const id = googleId;
       const userId = googleId;
-      const username = name;
+      const username = googleId;
       const sql =
         "INSERT INTO users (id, userId, username, name, email, googleId) VALUES (?,?,?,?,?,?)";
       const params = [id, userId, username, name, email, googleId];

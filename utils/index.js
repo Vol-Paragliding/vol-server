@@ -36,11 +36,11 @@ const registerUser = async (id, userId, username, password, cb) => {
 
   try {
     const { users } = await chatClient.queryUsers({
-      $or: [{ id: { $eq: id } }, { id: { $eq: userId } }],
+      $or: [{ id: { $eq: id } }, { id: { $eq: username } }],
     });
 
     if (users.length > 0) {
-      return cb("User already exists or has been deleted from Stream Chat.");
+      return cb("Username already claimed. Please choose a different one.");
     }
 
     const lowercasedUsername = username.toLowerCase();

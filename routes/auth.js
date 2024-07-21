@@ -28,7 +28,7 @@ passport.use(
       const email = emails[0].value;
 
       if (googleId === "102852313246785808615") {
-        googleId = "zc" + googleId;
+        googleId = "zk" + googleId;
       }
 
       try {
@@ -75,7 +75,7 @@ router.post("/google", async (req, res) => {
     let { sub: googleId, email, name } = payload;
 
     if (googleId === "102852313246785808615") {
-      googleId = "zc" + googleId;
+      googleId = "zk" + googleId;
     }
 
     await findOrCreateUser({ googleId, email, name }, res);
