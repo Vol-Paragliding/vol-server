@@ -1,5 +1,3 @@
-const crypto = require("crypto");
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("../db");
 
@@ -11,15 +9,13 @@ const {
   searchUsers,
   searchUsersHandler,
   deleteUser,
-  googleAuthCallback,
 } = require("../utils");
 
 const signup = async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const userId = username;
+    const { username, password, email, userId, id } = req.body;
 
-    registerUser(userId, username, password, function (err, result) {
+    registerUser(id, userId, username, password, function (err, result) {
       signupHandler(err, result, res);
     });
   } catch (err) {
@@ -61,35 +57,56 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
         "SELECT * FROM users WHERE googleId = ?",
         [googleId],
         (err, row) => {
-          if (err) return reject(err);
+          if (err) {
+            console.error("Error querying database:", err);
+            return reject(err);
+          }
           resolve(row);
         }
       );
     });
 
     if (user) {
-      // User exists, handle login
-      console.log('user', user);
-      await loginHandler(null, user, res);
-    } else {
-      // User does not exist, register new user
+      const id = user.id;
       const userId = googleId;
+      const username = user.username || googleId;
+
+      try {
+        await loginHandler(null, { username, id, userId, name }, res);
+      } catch (error) {
+        console.error("Error logging in user:", error);
+        res.status(500).json({ message: "Error logging in user" });
+      }
+    } else {
+      const id = googleId;
+      const userId = googleId;
+      const username = name;
       const sql =
-        "INSERT INTO users (id, username, email, googleId) VALUES (?,?,?,?)";
-      const params = [userId, name, email, googleId];
+        "INSERT INTO users (id, userId, username, name, email, googleId) VALUES (?,?,?,?,?,?)";
+      const params = [id, userId, username, name, email, googleId];
       await new Promise((resolve, reject) => {
         db.run(sql, params, async (err) => {
-          if (err) return reject(err);
+          if (err) {
+            console.error("Error inserting user into database:", err);
+            return reject(err);
+          }
 
-          const newUser = { id: userId, username: name, email, googleId };
+          const newUser = { id, userId, username, name, email, googleId };
 
-          // Call signupHandler after creating new user
-          await signupHandler(null, newUser, res);
-          resolve(newUser);
+          try {
+            await signupHandler(null, newUser, res);
+            resolve(newUser);
+          } catch (error) {
+            console.error("Error creating user in feed or chat:", error);
+            res
+              .status(500)
+              .json({ message: "Error creating user in feed or chat" });
+          }
         });
       });
     }
   } catch (err) {
+    console.error("Error in findOrCreateUser:", err);
     res.status(500).json({ message: "Error processing user" });
   }
 };
@@ -109,7 +126,6 @@ module.exports = {
   login,
   users,
   deleteUser,
-  googleAuthCallback,
   findOrCreateUser,
   generateTokens,
 };

@@ -31,27 +31,52 @@ const verifyUser = (username, password, cb) => {
   );
 };
 
-const registerUser = (userId, username, password, cb) => {
-  const lowercasedUsername = username.toLowerCase();
-  const lowercasedUserId = userId.toLowerCase();
-  const salt = bcrypt.genSaltSync(10);
-  const hashed_password = bcrypt.hashSync(password, salt);
+const registerUser = async (id, userId, username, password, cb) => {
+  const chatClient = StreamChat.getInstance(api_key, api_secret);
 
-  const sql =
-    "INSERT INTO users (id, username, hashed_password, salt) VALUES (?,?,?,?)";
-  const params = [lowercasedUserId, lowercasedUsername, hashed_password, salt];
-  db.run(sql, params, function (err, innerResult) {
-    if (err) {
-      cb(err, innerResult);
-    } else {
-      cb(null, {
-        userId: lowercasedUserId,
-        username: lowercasedUsername,
-        hashed_password,
-        salt,
-      });
+  try {
+    const { users } = await chatClient.queryUsers({
+      $or: [{ id: { $eq: id } }, { id: { $eq: userId } }],
+    });
+
+    if (users.length > 0) {
+      return cb("User already exists or has been deleted from Stream Chat.");
     }
-  });
+
+    const lowercasedUsername = username.toLowerCase();
+    const lowercasedUserId = userId.toLowerCase();
+    const lowercasedId = id.toLowerCase();
+    const salt = bcrypt.genSaltSync(10);
+    const hashed_password = bcrypt.hashSync(password, salt);
+    const email = "";
+
+    const sql =
+      "INSERT INTO users (id, userId, username, hashed_password, salt, email) VALUES (?,?,?,?,?,?)";
+    const params = [
+      lowercasedId,
+      lowercasedUserId,
+      lowercasedUsername,
+      hashed_password,
+      salt,
+      email,
+    ];
+    db.run(sql, params, function (err) {
+      if (err) {
+        cb(err, null);
+      } else {
+        cb(null, {
+          id: lowercasedId,
+          userId: lowercasedUserId,
+          username: lowercasedUsername,
+          hashed_password,
+          salt,
+          email,
+        });
+      }
+    });
+  } catch (err) {
+    return cb("Error querying Stream Chat: " + err.message, null);
+  }
 };
 
 const searchUsers = (searchTerm, selfUserId, cb) => {
@@ -68,14 +93,15 @@ const searchUsers = (searchTerm, selfUserId, cb) => {
   });
 };
 
-const signupHandler = async (err, result, res) => {
-  if (err) {
-    res.status(500).json({ message: err });
+const signupHandler = async (error, result, res) => {
+  if (error) {
+    res.status(500).json({ message: error });
     return;
   }
-  const { username, userId } = result;
+  const { username, userId, id, name, email = "" } = result;
   const lowercasedUsername = username.toLowerCase();
   const lowercasedUserId = userId.toLowerCase();
+  const lowercasedId = id.toLowerCase();
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -83,16 +109,22 @@ const signupHandler = async (err, result, res) => {
   try {
     const chatClient = StreamChat.getInstance(api_key, api_secret);
     await chatClient.upsertUser({
-      id: lowercasedUserId,
+      id: lowercasedId,
+      userId: lowercasedUserId,
+      name: name || username,
       username: lowercasedUsername,
+      email,
     });
 
-    const user = await feedClient.user(lowercasedUserId).create({
-      name: lowercasedUsername,
-      id: lowercasedUserId,
+    const user = await feedClient.user(lowercasedId).create({
+      id: lowercasedId,
+      userId: lowercasedUserId,
+      name: name || username,
+      username: lowercasedUsername,
+      email,
     });
 
-    const userFeed = feedClient.feed("user", lowercasedUserId);
+    const userFeed = feedClient.feed("user", lowercasedId);
     await userFeed.addActivity({
       actor: user,
       verb: "signup",
@@ -100,18 +132,23 @@ const signupHandler = async (err, result, res) => {
       text: `${user.id} has signed up! 🎉🎉🎉`,
     });
 
-    const timelineFeed = feedClient.feed("timeline", lowercasedUserId);
-    await timelineFeed.follow("user", lowercasedUserId);
-    const notificationFeed = feedClient.feed("notification", lowercasedUserId);
+    const timelineFeed = feedClient.feed("timeline", lowercasedId);
+    await timelineFeed.follow("user", lowercasedId);
+    const notificationFeed = feedClient.feed("notification", lowercasedId);
 
-    const feedToken = feedClient.createUserToken(lowercasedUserId);
-    const chatToken = chatClient.createToken(lowercasedUserId);
+    const feedToken = feedClient.createUserToken(lowercasedId);
+    const chatToken = chatClient.createToken(lowercasedId);
 
     res.status(200).json({
       feedToken,
       chatToken,
-      username: lowercasedUsername,
-      userId: lowercasedUserId,
+      user: {
+        id: lowercasedId,
+        userId: lowercasedUserId,
+        name: name || lowercasedUsername,
+        username: lowercasedUsername,
+        email,
+      },
     });
   } catch (error) {
     console.error(error.message);
@@ -125,12 +162,14 @@ const signupHandler = async (err, result, res) => {
 
 const loginHandler = async (error, result, res) => {
   if (error) {
+    console.error("Error in loginHandler:", error);
     res.status(500).json({ message: error });
     return;
   }
-  const { username, id } = result;
+  const { username, id, userId, name } = result;
   const lowercasedUsername = username.toLowerCase();
-  const lowercasedUserId = id.toLowerCase();
+  const lowercasedUserId = userId.toLowerCase();
+  const lowercasedId = id.toLowerCase();
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -138,24 +177,28 @@ const loginHandler = async (error, result, res) => {
   try {
     const chatClient = StreamChat.getInstance(api_key, api_secret);
     const { users } = await chatClient.queryUsers({
-      id: { $eq: lowercasedUserId },
+      id: { $eq: lowercasedId },
     });
     if (!users.length) {
-      return res
-        .status(400)
-        .json({ message: "User not found in Chat Database" });
+      console.log("User not found");
+      return res.status(400).json({ message: "User not found" });
     }
 
-    const chatToken = chatClient.createToken(lowercasedUserId);
-    const feedToken = feedClient.createUserToken(lowercasedUserId);
+    const chatToken = chatClient.createToken(lowercasedId);
+    const feedToken = feedClient.createUserToken(lowercasedId);
 
     res.status(200).json({
       feedToken,
       chatToken,
-      username: lowercasedUsername,
-      userId: lowercasedUserId,
+      user: {
+        username: lowercasedUsername,
+        userId: lowercasedUserId,
+        id: lowercasedId,
+        name,
+      },
     });
   } catch (error) {
+    console.error("Error in loginHandler 2:", error);
     res.status(500).json({ message: "Error querying user in Stream Chat" });
   }
 };
@@ -251,89 +294,6 @@ const deleteUser = async (req, res) => {
   }
 };
 
-const googleAuthCallback = async (accessToken, refreshToken, profile, done) => {
-  const lowercasedUsername = profile.emails[0].value.toLowerCase();
-  const lowercasedUserId = profile.id.toLowerCase();
-
-  const feedClient = connect(api_key, api_secret, app_id, {
-    location: "us-east",
-  });
-
-  try {
-    const chatClient = StreamChat.getInstance(api_key, api_secret);
-    let userExists = false;
-
-    const existingUser = await new Promise((resolve, reject) => {
-      db.get(
-        "SELECT * FROM users WHERE id = ?",
-        [lowercasedUserId],
-        function (err, row) {
-          if (err) return reject(err);
-          if (row) {
-            userExists = true;
-            resolve(row);
-          } else {
-            resolve(null);
-          }
-        }
-      );
-    });
-
-    if (!userExists) {
-      await new Promise((resolve, reject) => {
-        registerUser(
-          lowercasedUserId,
-          lowercasedUsername,
-          null,
-          (err, user) => {
-            if (err) return reject(err);
-            resolve(user);
-          }
-        );
-      });
-
-      await chatClient.upsertUser({
-        id: lowercasedUserId,
-        username: lowercasedUsername,
-      });
-
-      const user = await feedClient.user(lowercasedUserId).create({
-        name: lowercasedUsername,
-        id: lowercasedUserId,
-      });
-
-      const userFeed = feedClient.feed("user", lowercasedUserId);
-      await userFeed.addActivity({
-        actor: user,
-        verb: "signup",
-        object: `${user.id} has signed up! 🎉🎉🎉`,
-        text: `${user.id} has signed up! 🎉🎉🎉`,
-      });
-
-      const timelineFeed = feedClient.feed("timeline", lowercasedUserId);
-      await timelineFeed.follow("user", lowercasedUserId);
-      const notificationFeed = feedClient.feed(
-        "notification",
-        lowercasedUserId
-      );
-    }
-
-    const feedToken = feedClient.createUserToken(lowercasedUserId);
-    const chatToken = chatClient.createToken(lowercasedUserId);
-
-    return done(null, {
-      profile,
-      feedToken,
-      chatToken,
-      username: lowercasedUsername,
-      userId: lowercasedUserId,
-    });
-  } catch (error) {
-    console.error(error.message);
-    return done(error);
-  }
-};
-
 module.exports = {
   verifyUser,
   loginHandler,
@@ -342,5 +302,4 @@ module.exports = {
   searchUsersHandler,
   searchUsers,
   deleteUser,
-  googleAuthCallback,
 };

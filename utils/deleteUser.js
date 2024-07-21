@@ -1,7 +1,5 @@
 const { connect } = require("getstream");
 const StreamChat = require("stream-chat").StreamChat;
-const bcrypt = require("bcrypt");
-
 const db = require("../db");
 require("dotenv").config();
 
@@ -9,10 +7,12 @@ const api_key = process.env.STREAM_API_KEY;
 const api_secret = process.env.STREAM_API_SECRET;
 const app_id = process.env.STREAM_APP_ID;
 
-const deleteUser = async (userId, cb) => {
+const deleteUsers = async (userIds, cb) => {
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
+
+  const chatClient = StreamChat.getInstance(api_key, api_secret);
 
   let feedError = null;
   let chatError = null;
@@ -23,26 +23,32 @@ const deleteUser = async (userId, cb) => {
   let dbSuccess = false;
 
   try {
-    // Attempt to delete user from the feed database
-    await feedClient.user(userId).delete();
-    feedSuccess = true;
-  } catch (error) {
-    feedError = error;
-  }
-
-  try {
-    // Attempt to delete user from the chat database
-    const chatClient = StreamChat.getInstance(api_key, api_secret);
-    await chatClient.deleteUser(userId, { mark_messages_deleted: true });
+    // Attempt to delete users from the chat database
+    await chatClient.deleteUsers(userIds, {
+      hard_delete: true,
+      mark_messages_deleted: true,
+      delete_conversation_channels: true,
+    });
     chatSuccess = true;
   } catch (error) {
     chatError = error;
   }
 
   try {
-    // Attempt to delete user from the local database
-    const sql = "DELETE FROM users WHERE id = ?";
-    db.run(sql, [userId], function (err) {
+    // Attempt to delete users from the feed database
+    for (const userId of userIds) {
+      await feedClient.user(userId).delete();
+    }
+    feedSuccess = true;
+  } catch (error) {
+    feedError = error;
+  }
+
+  try {
+    // Attempt to delete users from the local database
+    const placeholders = userIds.map(() => "?").join(",");
+    const sql = `DELETE FROM users WHERE id IN (${placeholders})`;
+    db.run(sql, userIds, function (err) {
       if (err) {
         dbError = err;
       } else {
@@ -56,7 +62,7 @@ const deleteUser = async (userId, cb) => {
   }
 
   function generateLogMessage() {
-    let logMessage = `Deletion results for userId ${userId}: \n`;
+    let logMessage = `Deletion results for userIds ${userIds.join(", ")}: \n`;
 
     if (feedSuccess) {
       logMessage += "- Successfully deleted from Feed database\n";
@@ -91,12 +97,25 @@ const deleteUser = async (userId, cb) => {
   }
 };
 
-// Example usage:
-const userToDelete = "zach";
+// const restoreUser = async (userId) => {
+//   const chatClient = StreamChat.getInstance(api_key, api_secret);
 
-deleteUser(userToDelete, (err, result) => {
+//   try {
+//     const response = await chatClient.restoreUsers([userId]);
+//     console.log(`User ${userId} successfully restored:`, response);
+//   } catch (error) {
+//     console.error(`Error restoring user ${userId}:`, error.message);
+//   }
+// };
+
+// const userId = "102852313246785808615";
+
+// restoreUser(userId);
+
+const usersToDelete = ["c9011a36c4444184bdf8f","zach102852313246785808615"];
+deleteUsers(usersToDelete, (err, result) => {
   if (err) {
-    console.error("Errors encountered while deleting user:", err);
+    console.error("Errors encountered while deleting users:", err);
   } else {
     console.log(result);
   }

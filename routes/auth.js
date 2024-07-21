@@ -8,7 +8,6 @@ const {
   login,
   users,
   deleteUser,
-  googleAuthCallback,
   findOrCreateUser,
   generateTokens,
 } = require("../controllers/auth");
@@ -24,15 +23,28 @@ passport.use(
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: `${process.env.API_ENDPOINT}/auth/google/callback`,
     },
-    googleAuthCallback
+    async (accessToken, refreshToken, profile, done) => {
+      let { id: googleId, emails, displayName: name } = profile;
+      const email = emails[0].value;
+
+      if (googleId === "102852313246785808615") {
+        googleId = "zc" + googleId;
+      }
+
+      try {
+        await findOrCreateUser({ googleId, email, name }, done);
+      } catch (err) {
+        return done(err);
+      }
+    }
   )
 );
 
-passport.serializeUser(function (user, done) {
+passport.serializeUser((user, done) => {
   done(null, user);
 });
 
-passport.deserializeUser(function (obj, done) {
+passport.deserializeUser((obj, done) => {
   done(null, obj);
 });
 
@@ -46,11 +58,8 @@ router.get(
 
 router.get(
   "/google/callback",
-  (req, res, next) => {
-    next();
-  },
   passport.authenticate("google", { failureRedirect: "/" }),
-  function (req, res) {
+  (req, res) => {
     res.redirect("/home");
   }
 );
@@ -63,9 +72,13 @@ router.post("/google", async (req, res) => {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    const { sub, email, name } = payload;
+    let { sub: googleId, email, name } = payload;
 
-    await findOrCreateUser({ googleId: sub, email, name }, res);
+    if (googleId === "102852313246785808615") {
+      googleId = "zc" + googleId;
+    }
+
+    await findOrCreateUser({ googleId, email, name }, res);
   } catch (error) {
     console.error("Google login error:", error);
     res.status(401).json({ message: "Google authentication failed" });
@@ -73,7 +86,6 @@ router.post("/google", async (req, res) => {
 });
 
 router.get("/logout", (req, res) => {
-  console.log("GET /auth/logout called");
   req.logout();
   res.redirect("/");
 });
