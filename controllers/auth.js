@@ -13,11 +13,23 @@ const {
 
 const signup = async (req, res) => {
   try {
-    const { username, password, email, userId, id } = req.body;
+    const { identifier, password, email, userId, id, username, name } = req.body;
 
-    registerUser(id, userId, username, password, function (err, result) {
-      signupHandler(err, result, res);
-    });
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+    const emailToUse = isEmail ? identifier : email;
+    const usernameToUse = isEmail ? username : identifier;
+
+    registerUser(
+      id,
+      userId,
+      usernameToUse,
+      password,
+      emailToUse,
+      name,
+      function (err, result) {
+        signupHandler(err, result, res);
+      }
+    );
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: err });
@@ -67,9 +79,7 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
     });
 
     if (user) {
-      const id = user.id;
-      const userId = user.userId;
-      const username = user.username;
+      const { id, userId, username, name } = user;
 
       try {
         await loginHandler(null, { username, id, userId, name }, res);

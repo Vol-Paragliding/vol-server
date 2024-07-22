@@ -3,6 +3,7 @@ const passport = require("passport");
 const { OAuth2Client } = require("google-auth-library");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
+const db = require("../db");
 const {
   signup,
   login,
@@ -26,9 +27,8 @@ passport.use(
     async (accessToken, refreshToken, profile, done) => {
       let { id: googleId, emails, displayName: name } = profile;
       const email = emails[0].value;
-
       if (googleId === "102852313246785808615") {
-        googleId = "zk" + googleId;
+        googleId = "zack" + googleId;
       }
 
       try {
@@ -75,13 +75,72 @@ router.post("/google", async (req, res) => {
     let { sub: googleId, email, name } = payload;
 
     if (googleId === "102852313246785808615") {
-      googleId = "zk" + googleId;
+      googleId = "zack" + googleId;
     }
 
     await findOrCreateUser({ googleId, email, name }, res);
   } catch (error) {
     console.error("Google login error:", error);
     res.status(401).json({ message: "Google authentication failed" });
+  }
+});
+
+router.post("/check-availability", async (req, res) => {
+  const { identifier } = req.body;
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
+
+  try {
+    const query = isEmail
+      ? "SELECT * FROM users WHERE email = ?"
+      : "SELECT * FROM users WHERE username = ?";
+    const result = await new Promise((resolve, reject) => {
+      db.get(query, [identifier], (err, row) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(row);
+      });
+    });
+
+    if (result) {
+      res
+        .status(409)
+        .json({
+          message: isEmail ? "Email already exists" : "Username already exists",
+        });
+    } else {
+      res
+        .status(200)
+        .json({ message: isEmail ? "Email available" : "Username available" });
+    }
+  } catch (error) {
+    console.error("Error checking availability:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/get-user-id", async (req, res) => {
+  const { username } = req.body;
+
+  try {
+    const userId = await new Promise((resolve, reject) => {
+      const sql = "SELECT id FROM users WHERE username = ?";
+      db.get(sql, [username], (err, row) => {
+        if (err) {
+          return reject(err);
+        }
+        if (row) {
+          resolve(row.id);
+        } else {
+          reject(new Error("User not found"));
+        }
+      });
+    });
+
+    res.status(200).json({ userId });
+  } catch (error) {
+    console.error("Error fetching user ID:", error);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 

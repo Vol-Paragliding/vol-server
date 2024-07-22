@@ -31,27 +31,16 @@ const verifyUser = (username, password, cb) => {
   );
 };
 
-const registerUser = async (id, userId, username, password, cb) => {
-  const chatClient = StreamChat.getInstance(api_key, api_secret);
-
+const registerUser = (id, userId, username, password, email, name, cb) => {
   try {
-    const { users } = await chatClient.queryUsers({
-      $or: [{ id: { $eq: id } }, { id: { $eq: username } }],
-    });
-
-    if (users.length > 0) {
-      return cb("Username already claimed. Please choose a different one.");
-    }
-
     const lowercasedUsername = username.toLowerCase();
     const lowercasedUserId = userId.toLowerCase();
     const lowercasedId = id.toLowerCase();
     const salt = bcrypt.genSaltSync(10);
     const hashed_password = bcrypt.hashSync(password, salt);
-    const email = "";
 
     const sql =
-      "INSERT INTO users (id, userId, username, hashed_password, salt, email) VALUES (?,?,?,?,?,?)";
+      "INSERT INTO users (id, userId, username, hashed_password, salt, email, name) VALUES (?,?,?,?,?,?,?)";
     const params = [
       lowercasedId,
       lowercasedUserId,
@@ -59,6 +48,7 @@ const registerUser = async (id, userId, username, password, cb) => {
       hashed_password,
       salt,
       email,
+      name,
     ];
     db.run(sql, params, function (err) {
       if (err) {
@@ -71,11 +61,12 @@ const registerUser = async (id, userId, username, password, cb) => {
           hashed_password,
           salt,
           email,
+          name,
         });
       }
     });
   } catch (err) {
-    return cb("Error querying Stream Chat: " + err.message, null);
+    cb(err, null);
   }
 };
 
@@ -145,7 +136,7 @@ const signupHandler = async (error, result, res) => {
       user: {
         id: lowercasedId,
         userId: lowercasedUserId,
-        name: name || lowercasedUsername,
+        name: name || username,
         username: lowercasedUsername,
         email,
       },
