@@ -2,7 +2,6 @@ const express = require("express");
 const passport = require("passport");
 const { OAuth2Client } = require("google-auth-library");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
-
 const db = require("../db");
 const {
   signup,
@@ -14,7 +13,6 @@ const {
 } = require("../controllers/auth");
 
 const router = express.Router();
-
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 passport.use(
@@ -50,9 +48,6 @@ passport.deserializeUser((obj, done) => {
 
 router.get(
   "/google",
-  (req, res, next) => {
-    next();
-  },
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
@@ -103,11 +98,9 @@ router.post("/check-availability", async (req, res) => {
     });
 
     if (result) {
-      res
-        .status(409)
-        .json({
-          message: isEmail ? "Email already exists" : "Username already exists",
-        });
+      res.status(409).json({
+        message: isEmail ? "Email already exists" : "Username already exists",
+      });
     } else {
       res
         .status(200)
