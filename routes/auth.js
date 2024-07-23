@@ -137,6 +137,35 @@ router.post("/get-user-id", async (req, res) => {
   }
 });
 
+router.post("/update-profile", async (req, res) => {
+  const { id, username, name, email, bio, location, image, coverPhoto } =
+    req.body;
+
+  const sql = `
+    UPDATE users
+    SET username = ?, name = ?, email = ?, bio = ?, location = ?, image = ?, coverPhoto = ?
+    WHERE id = ?
+  `;
+  const params = [username, name, email, bio, location, image, coverPhoto, id];
+
+  try {
+    await new Promise((resolve, reject) => {
+      db.run(sql, params, function (err) {
+        if (err) {
+          return reject(err);
+        }
+        resolve(this);
+      });
+    });
+    res
+      .status(200)
+      .json({ message: "Profile updated successfully", user: req.body });
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    res.status(500).json({ message: "Error updating user profile" });
+  }
+});
+
 router.get("/logout", (req, res) => {
   req.logout();
   res.redirect("/");

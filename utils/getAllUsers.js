@@ -7,17 +7,45 @@ const api_key = process.env.STREAM_API_KEY;
 const api_secret = process.env.STREAM_API_SECRET;
 const app_id = process.env.STREAM_APP_ID;
 
+// const feedClient = connect(api_key, api_secret, app_id, {
+//   location: "us-east",
+// });
+// const chatClient = StreamChat.getInstance(api_key, api_secret);
+
+const updateUserUsername = async (id, newUsername, cb) => {
+  // Update SQLite database
+  const sql = "UPDATE users SET username = ? WHERE id = ?";
+  db.run(sql, [newUsername, id], async function (err) {
+    if (err) {
+      return cb(err);
+    }
+
+    // Update user in Feed
+    // try {
+    //   await feedClient.user(id).update({ id, username: newUsername });
+    // } catch (error) {
+    //   console.error("Error updating user in feed database:", error);
+    //   return cb(error);
+    // }
+
+    // // Update user in Chat
+    // try {
+    //   await chatClient.upsertUser({ id, username: newUsername });
+    // } catch (error) {
+    //   console.error("Error updating user in chat database:", error);
+    //   return cb(error);
+    // }
+
+    cb(null, { message: "Username updated successfully" });
+  });
+};
+
 const getAllUsers = (cb) => {
   const sql = "SELECT * FROM users WHERE id != 'zacheryconverse'";
   db.all(sql, [], async (err, rows) => {
     if (err) {
       return cb(err);
     }
-
-    const feedClient = connect(api_key, api_secret, app_id, {
-      location: "us-east",
-    });
-    const chatClient = StreamChat.getInstance(api_key, api_secret);
 
     const results = await Promise.all(
       rows.map(async (user) => {
@@ -53,13 +81,22 @@ const getAllUsers = (cb) => {
   });
 };
 
-// Example usage:
-getAllUsers((err, users) => {
-  if (err) {
-    console.error("Error fetching users from the database:", err);
-    return;
-  }
-  console.log("Users and their existence in databases:", users);
-});
+// getAllUsers((err, users) => {
+//   if (err) {
+//     console.error("Error fetching users from the database:", err);
+//     return;
+//   }
+//   console.log("Users and their existence in databases:", users);
+// });
 
-module.exports = getAllUsers;
+// const userIdToUpdate = "zack102852313246785808615";
+// const newUsername = "zack-attack";
+// updateUserUsername(userIdToUpdate, newUsername, (err, result) => {
+//   if (err) {
+//     console.error("Error updating username:", err);
+//     return;
+//   }
+//   console.log(result);
+// });
+
+module.exports = { getAllUsers, updateUserUsername };
