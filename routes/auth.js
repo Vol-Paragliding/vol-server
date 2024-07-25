@@ -125,10 +125,14 @@ router.post("/get-user-id", async (req, res) => {
         if (row) {
           resolve(row.id);
         } else {
-          reject(new Error("User not found"));
+          resolve(null);
         }
       });
     });
+
+    if (userId === null) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     res.status(200).json({ userId });
   } catch (error) {
@@ -138,15 +142,33 @@ router.post("/get-user-id", async (req, res) => {
 });
 
 router.post("/update-profile", async (req, res) => {
-  const { id, username, name, email, bio, location, image, coverPhoto } =
-    req.body;
+  const { id, ...updates } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ message: "User ID is required" });
+  }
+
+  const updateFields = [];
+  const params = [];
+
+  Object.keys(updates).forEach((field) => {
+    if (updates[field] !== undefined) {
+      updateFields.push(`${field} = ?`);
+      params.push(updates[field]);
+    }
+  });
+
+  if (updateFields.length === 0) {
+    return res.status(400).json({ message: "No valid fields to update" });
+  }
+
+  params.push(id);
 
   const sql = `
     UPDATE users
-    SET username = ?, name = ?, email = ?, bio = ?, location = ?, image = ?, coverPhoto = ?
+    SET ${updateFields.join(", ")}
     WHERE id = ?
   `;
-  const params = [username, name, email, bio, location, image, coverPhoto, id];
 
   try {
     await new Promise((resolve, reject) => {

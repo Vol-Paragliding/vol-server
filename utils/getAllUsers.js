@@ -81,13 +81,71 @@ const getAllUsers = (cb) => {
   });
 };
 
-// getAllUsers((err, users) => {
-//   if (err) {
-//     console.error("Error fetching users from the database:", err);
-//     return;
-//   }
-//   console.log("Users and their existence in databases:", users);
+const columns = [
+  { name: "username", type: "TEXT" },
+  { name: "name", type: "TEXT" },
+  { name: "email", type: "TEXT" },
+  { name: "bio", type: "TEXT" },
+  { name: "location", type: "TEXT" },
+  { name: "image", type: "TEXT" },
+  { name: "coverPhoto", type: "TEXT" },
+  { name: "yearStartedFlying", type: "INTEGER" },
+  { name: "favoriteSites", type: "TEXT" },
+  { name: "certifications", type: "TEXT" },
+];
+
+function columnExists(columnName, callback) {
+  db.all(`PRAGMA table_info(users)`, (err, tableInfo) => {
+    if (err) {
+      console.error(err);
+      callback(false);
+    } else {
+      const exists =
+        Array.isArray(tableInfo) &&
+        tableInfo.some((col) => col.name === columnName);
+      callback(exists);
+    }
+  });
+}
+
+function addColumn(columnName, columnType, callback) {
+  db.run(`ALTER TABLE users ADD COLUMN ${columnName} ${columnType}`, callback);
+}
+
+function ensureColumnsExist(columns, callback) {
+  let completed = 0;
+
+  columns.forEach(({ name, type }) => {
+    columnExists(name, (exists) => {
+      if (!exists) {
+        addColumn(name, type, (err) => {
+          if (err) {
+            console.error(`Error adding column ${name}:`, err);
+          } else {
+            console.log(`Added column ${name}`);
+          }
+          if (++completed === columns.length) callback();
+        });
+      } else {
+        console.log(`Column ${name} already exists`);
+        if (++completed === columns.length) callback();
+      }
+    });
+  });
+}
+
+// ensureColumnsExist(columns, () => {
+//   console.log("Finished ensuring all columns exist");
+//   db.close();
 // });
+
+getAllUsers((err, users) => {
+  if (err) {
+    console.error("Error fetching users from the database:", err);
+    return;
+  }
+  console.log("Users and their existence in databases:", users);
+});
 
 // const userIdToUpdate = "zack102852313246785808615";
 // const newUsername = "zack-attack";
