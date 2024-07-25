@@ -26,3 +26,4 @@ Temporary Items
 ### Node derived files ###
 node_modules/
 *.env
+/var/db/vol.db

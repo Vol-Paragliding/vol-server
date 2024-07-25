@@ -30,27 +30,28 @@ const createTable = () => {
   );
 };
 
-// create an initial user (username: alice, password: letmein)
 const createInitialUser = () => {
-  const salt = crypto.randomBytes(16);
-  const hashedPassword = crypto.pbkdf2Sync(
-    "letmein",
-    salt,
-    310000,
-    32,
-    "sha256"
-  );
-  db.run(
-    "INSERT OR IGNORE INTO users (id, username, hashed_password, salt) VALUES (?, ?, ?, ?)",
-    [crypto.randomUUID(), "alice", hashedPassword, salt],
-    (err) => {
-      if (err) {
-        console.error(`Error inserting initial user: ${err.message}`);
-      } else {
-        console.info("Initial user inserted or already exists.");
+  if (process.env.NODE_ENV !== "production") {
+    const salt = crypto.randomBytes(16);
+    const hashedPassword = crypto.pbkdf2Sync(
+      "letmein",
+      salt,
+      310000,
+      32,
+      "sha256"
+    );
+    db.run(
+      "INSERT OR IGNORE INTO users (id, username, hashed_password, salt) VALUES (?, ?, ?, ?)",
+      [crypto.randomUUID(), "alice", hashedPassword, salt],
+      (err) => {
+        if (err) {
+          console.error(`Error inserting initial user: ${err.message}`);
+        } else {
+          console.info("Initial user inserted or already exists.");
+        }
       }
-    }
-  );
+    );
+  }
 };
 
 // Function to ensure new columns exist
