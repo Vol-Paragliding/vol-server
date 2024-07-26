@@ -1,11 +1,10 @@
-/**
- * @type { Object.<string, import("knex").Knex.Config> }
- */
+require("dotenv").config();
+
 module.exports = {
   development: {
     client: "sqlite3",
     connection: {
-      filename: "./var/db/vol.db",
+      filename: process.env.DEV_DATABASE_URL,
     },
     useNullAsDefault: true,
     migrations: {
@@ -16,7 +15,7 @@ module.exports = {
   production: {
     client: "sqlite3",
     connection: {
-      filename: "./var/db/vol.db",
+      filename: process.env.PROD_DATABASE_URL,
     },
     useNullAsDefault: true,
     migrations: {
