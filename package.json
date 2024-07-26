@@ -26,6 +26,7 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "sqlite3": "^5.1.4",
-    "stream-chat": "^8.2.1"
+    "stream-chat": "^8.2.1",
+    "unique-names-generator": "^4.7.1"
   }
 }

@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const db = require("../db");
+const crypto = require("crypto");
+const { uniqueNamesGenerator, Config } = require("unique-names-generator");
 
 const {
   loginHandler,
@@ -62,10 +64,178 @@ const users = async (req, res) => {
   }
 };
 
+const adjectives = [
+  "brave",
+  "bold",
+  "agile",
+  "free",
+  "swift",
+  "soar",
+  "keen",
+  "fierce",
+  "cool",
+  "quick",
+  "light",
+  "sturdy",
+  "vivid",
+  "mighty",
+  "wild",
+  "fast",
+  "great",
+  "zesty",
+  "strong",
+  "gallant",
+  "rapid",
+  "epic",
+  "nimble",
+  "daring",
+  "bright",
+  "fearless",
+  "dashing",
+  "heroic",
+  "skilled",
+  "active",
+  "breezy",
+  "sunny",
+  "steady",
+  "calm",
+  "airy",
+  "spirited",
+  "soaring",
+  "gliding",
+  "cheerful",
+  "joyful",
+  "lively",
+  "radiant",
+  "intrepid",
+  "zealous",
+  "eager",
+  "bold",
+  "smart",
+  "happy",
+  "keen",
+  "brisk",
+  "alert",
+  "spry",
+  "bouncy",
+  "partly",
+  "hot",
+  "warm",
+  "nice",
+  "yeeted",
+];
+
+const nouns = [
+  "air",
+  "wing",
+  "air",
+  "sky",
+  "peak",
+  "ridge",
+  "hawk",
+  "cloud",
+  "zephyr",
+  "glide",
+  "soar",
+  "flight",
+  "breeze",
+  "gust",
+  "guy",
+  "gal",
+  "summit",
+  "pilot",
+  "flyer",
+  "therm",
+  "wind",
+  "jet",
+  "reserve",
+  "kite",
+  "eagle",
+  "falcon",
+  "canyon",
+  "captain",
+  "cliff",
+  "valley",
+  "hill",
+  "stream",
+  "river",
+  "lake",
+  "ocean",
+  "wave",
+  "horizon",
+  "sun",
+  "moon",
+  "star",
+  "space",
+  "earth",
+  "field",
+  "trail",
+  "path",
+  "route",
+  "quest",
+  "journey",
+  "voyage",
+  "trek",
+  "trip",
+  "safari",
+  "glow",
+  "drift",
+  "dash",
+  "sprint",
+  "boost",
+  "pulse",
+  "flare",
+  "lift",
+  "wing",
+  "glide",
+  "drift",
+  "cloudy",
+];
+
+const config = {
+  dictionaries: [adjectives, nouns],
+  separator: ".",
+  length: 2,
+};
+
+const generateUniqueUsername = async () => {
+  let username =
+    uniqueNamesGenerator(config) + Math.floor(10 + Math.random() * 90);
+
+  let exists = await new Promise((resolve, reject) => {
+    db.get(
+      "SELECT COUNT(*) as count FROM users WHERE username = ?",
+      [username],
+      (err, row) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(row.count > 0);
+      }
+    );
+  });
+
+  while (exists) {
+    username =
+      uniqueNamesGenerator(config) + Math.floor(10 + Math.random() * 90);
+    exists = await new Promise((resolve, reject) => {
+      db.get(
+        "SELECT COUNT(*) as count FROM users WHERE username = ?",
+        [username],
+        (err, row) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve(row.count > 0);
+        }
+      );
+    });
+  }
+
+  return username;
+};
+
 const findOrCreateUser = async ({ googleId, email, name }, res) => {
-  console.log(
-    `findOrCreateUser called with googleId: ${googleId}, email: ${email}, name: ${name}`
-  );
   try {
     const user = await new Promise((resolve, reject) => {
       db.get(
@@ -73,13 +243,7 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
         [googleId],
         (err, row) => {
           if (err) {
-            console.error("Error querying database:", err);
             return reject(err);
-          }
-          if (row) {
-            console.log(`User found in database: ${JSON.stringify(row)}`);
-          } else {
-            console.log("User not found in database");
           }
           resolve(row);
         }
@@ -96,24 +260,17 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
         res.status(500).json({ message: "Error logging in user" });
       }
     } else {
-      const id = googleId;
-      const userId = googleId;
-      const username = googleId;
+      const id = crypto.randomUUID();
+      const userId = id;
+      const username = await generateUniqueUsername();
       const sql =
         "INSERT INTO users (id, userId, username, name, email, googleId) VALUES (?,?,?,?,?,?)";
       const params = [id, userId, username, name, email, googleId];
-      console.log(
-        `Inserting new user into database with params: ${JSON.stringify(
-          params
-        )}`
-      );
       await new Promise((resolve, reject) => {
         db.run(sql, params, async (err) => {
           if (err) {
-            console.error("Error inserting user into database:", err);
             return reject(err);
           }
-
           const newUser = { id, userId, username, name, email, googleId };
 
           try {
@@ -134,19 +291,8 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
       });
     }
   } catch (err) {
-    console.error("Error in findOrCreateUser:", err);
     res.status(500).json({ message: "Error processing user" });
   }
-};
-
-const generateTokens = (user) => {
-  const feedToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-  const chatToken = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-  return { feedToken, chatToken };
 };
 
 module.exports = {
@@ -155,5 +301,4 @@ module.exports = {
   users,
   deleteUser,
   findOrCreateUser,
-  generateTokens,
 };

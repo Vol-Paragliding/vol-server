@@ -9,7 +9,6 @@ const {
   users,
   deleteUser,
   findOrCreateUser,
-  generateTokens,
 } = require("../controllers/auth");
 
 const router = express.Router();
@@ -23,11 +22,8 @@ passport.use(
       callbackURL: `${process.env.API_ENDPOINT}/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
-      let { id: googleId, emails, displayName: name } = profile;
+      const { id: googleId, emails, displayName: name } = profile;
       const email = emails[0].value;
-      if (googleId === "102852313246785808615") {
-        googleId = "zack" + googleId;
-      }
 
       try {
         await findOrCreateUser({ googleId, email, name }, done);
@@ -67,11 +63,7 @@ router.post("/google", async (req, res) => {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    let { sub: googleId, email, name } = payload;
-
-    if (googleId === "102852313246785808615") {
-      googleId = "zack" + googleId;
-    }
+    const { sub: googleId, email, name } = payload;
 
     await findOrCreateUser({ googleId, email, name }, res);
   } catch (error) {
