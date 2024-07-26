@@ -5,9 +5,17 @@ const bcrypt = require("bcrypt");
 const db = require("../db");
 require("dotenv").config();
 
-const api_key = process.env.STREAM_API_KEY;
-const api_secret = process.env.STREAM_API_SECRET;
-const app_id = process.env.STREAM_APP_ID;
+const isProduction = process.env.NODE_ENV === "production";
+
+const api_key = isProduction
+  ? process.env.PROD_STREAM_API_KEY
+  : process.env.STREAM_API_KEY;
+const api_secret = isProduction
+  ? process.env.PROD_STREAM_API_SECRET
+  : process.env.STREAM_API_SECRET;
+const app_id = isProduction
+  ? process.env.PROD_STREAM_APP_ID
+  : process.env.STREAM_APP_ID;
 
 const verifyUser = (username, password, cb) => {
   const lowercasedUsername = username.toLowerCase();
