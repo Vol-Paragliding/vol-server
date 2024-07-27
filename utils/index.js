@@ -1,7 +1,6 @@
 const { connect } = require("getstream");
 const StreamChat = require("stream-chat").StreamChat;
 const bcrypt = require("bcrypt");
-
 const db = require("../db");
 require("dotenv").config();
 
@@ -18,10 +17,9 @@ const app_id = isProduction
   : process.env.STREAM_APP_ID;
 
 const verifyUser = (username, password, cb) => {
-  const lowercasedUsername = username.toLowerCase();
   db.get(
-    "SELECT * FROM users WHERE LOWER(username) = ?",
-    [lowercasedUsername],
+    "SELECT * FROM users WHERE username = ?",
+    [username],
     function (err, row) {
       if (err) {
         return cb(err);
@@ -50,18 +48,15 @@ const registerUser = (
   cb
 ) => {
   try {
-    const lowercasedUsername = username.toLowerCase();
-    const lowercasedUserId = userId.toLowerCase();
-    const lowercasedId = id.toLowerCase();
     const salt = bcrypt.genSaltSync(10);
     const hashed_password = bcrypt.hashSync(password, salt);
 
     const sql =
       "INSERT INTO users (id, userId, username, hashed_password, salt, email, name, profile) VALUES (?,?,?,?,?,?,?,?)";
     const params = [
-      lowercasedId,
-      lowercasedUserId,
-      lowercasedUsername,
+      id,
+      userId,
+      username,
       hashed_password,
       salt,
       email,
@@ -73,9 +68,9 @@ const registerUser = (
         cb(err, null);
       } else {
         cb(null, {
-          id: lowercasedId,
-          userId: lowercasedUserId,
-          username: lowercasedUsername,
+          id,
+          userId,
+          username,
           hashed_password,
           salt,
           email,
@@ -109,9 +104,6 @@ const signupHandler = async (error, result, res) => {
     return;
   }
   const { username, userId, id, name, email = "", profile } = result;
-  const lowercasedUsername = username.toLowerCase();
-  const lowercasedUserId = userId.toLowerCase();
-  const lowercasedId = id.toLowerCase();
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -119,24 +111,24 @@ const signupHandler = async (error, result, res) => {
   try {
     const chatClient = StreamChat.getInstance(api_key, api_secret);
     await chatClient.upsertUser({
-      id: lowercasedId,
-      userId: lowercasedUserId,
+      id,
+      userId,
       name: name || username,
-      username: lowercasedUsername,
+      username,
       email,
       profile,
     });
 
-    const user = await feedClient.user(lowercasedId).create({
-      id: lowercasedId,
-      userId: lowercasedUserId,
+    const user = await feedClient.user(id).create({
+      id,
+      userId,
       name: name || username,
-      username: lowercasedUsername,
+      username,
       email,
       profile,
     });
 
-    const userFeed = feedClient.feed("user", lowercasedId);
+    const userFeed = feedClient.feed("user", id);
     await userFeed.addActivity({
       actor: user,
       verb: "signup",
@@ -144,21 +136,21 @@ const signupHandler = async (error, result, res) => {
       text: `${user.username} has signed up! 🎉🎉🎉`,
     });
 
-    const timelineFeed = feedClient.feed("timeline", lowercasedId);
-    await timelineFeed.follow("user", lowercasedId);
-    const notificationFeed = feedClient.feed("notification", lowercasedId);
+    const timelineFeed = feedClient.feed("timeline", id);
+    await timelineFeed.follow("user", id);
+    const notificationFeed = feedClient.feed("notification", id);
 
-    const feedToken = feedClient.createUserToken(lowercasedId);
-    const chatToken = chatClient.createToken(lowercasedId);
+    const feedToken = feedClient.createUserToken(id);
+    const chatToken = chatClient.createToken(id);
 
     res.status(200).json({
       feedToken,
       chatToken,
       user: {
-        id: lowercasedId,
-        userId: lowercasedUserId,
+        id,
+        userId,
         name: name || username,
-        username: lowercasedUsername,
+        username,
         email,
         profile,
       },
@@ -180,9 +172,6 @@ const loginHandler = async (error, result, res) => {
     return;
   }
   const { username, id, userId, name, profile } = result;
-  const lowercasedUsername = username.toLowerCase();
-  const lowercasedUserId = userId.toLowerCase();
-  const lowercasedId = id.toLowerCase();
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -190,23 +179,23 @@ const loginHandler = async (error, result, res) => {
   try {
     const chatClient = StreamChat.getInstance(api_key, api_secret);
     const { users } = await chatClient.queryUsers({
-      id: { $eq: lowercasedId },
+      id: { $eq: id },
     });
     if (!users.length) {
       console.log("User not found");
       return res.status(400).json({ message: "User not found" });
     }
 
-    const chatToken = chatClient.createToken(lowercasedId);
-    const feedToken = feedClient.createUserToken(lowercasedId);
+    const chatToken = chatClient.createToken(id);
+    const feedToken = feedClient.createUserToken(id);
 
     res.status(200).json({
       feedToken,
       chatToken,
       user: {
-        username: lowercasedUsername,
-        userId: lowercasedUserId,
-        id: lowercasedId,
+        username,
+        userId,
+        id,
         name,
         profile,
       },

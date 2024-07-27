@@ -41,43 +41,61 @@ const deleteUserScript = async () => {
 
     let feedDeletions = 0;
     let chatDeletions = 0;
+    const deletePromises = [];
 
     for (const userId of usersToDelete) {
-      try {
-        await feedClient.user(userId).delete();
-        console.log(`Deleted user ${userId} from Feed`);
-        feedDeletions++;
-      } catch (error) {
-        console.error(
-          `Failed to delete user ${userId} from Feed: ${error.message}`
-        );
-      }
+      deletePromises.push(
+        (async () => {
+          try {
+            await feedClient.user(userId).delete();
+            console.log(`Deleted user ${userId} from Feed`);
+            feedDeletions++;
+          } catch (error) {
+            console.error(
+              `Failed to delete user ${userId} from Feed: ${error.message}`
+            );
+          }
 
-      try {
-        await chatClient.deleteUser(userId, { mark_messages_deleted: true });
-        console.log(`Deleted user ${userId} from Chat`);
-        chatDeletions++;
-      } catch (error) {
-        console.error(
-          `Failed to delete user ${userId} from Chat: ${error.message}`
-        );
-      }
+          try {
+            await chatClient.deleteUser(userId, {
+              mark_messages_deleted: true,
+            });
+            console.log(`Deleted user ${userId} from Chat`);
+            chatDeletions++;
+          } catch (error) {
+            console.error(
+              `Failed to delete user ${userId} from Chat: ${error.message}`
+            );
+          }
 
-      db.run("DELETE FROM users WHERE id = ?", [userId], (err) => {
-        if (err) {
-          console.error(
-            `Failed to delete user ${userId} from SQLite: ${err.message}`
-          );
-        } else {
-          console.log(`Deleted user ${userId} from SQLite`);
-        }
-      });
+          db.run("DELETE FROM users WHERE id = ?", [userId], (err) => {
+            if (err) {
+              console.error(
+                `Failed to delete user ${userId} from SQLite: ${err.message}`
+              );
+            } else {
+              console.log(`Deleted user ${userId} from SQLite`);
+            }
+          });
 
-      if (feedDeletions >= 6 || chatDeletions >= 6) {
-        await delay(60100); // 60.1 seconds
-        feedDeletions = 0;
-        chatDeletions = 0;
+          if (feedDeletions >= 6 || chatDeletions >= 6) {
+            await delay(60100); // 60.1 seconds
+            feedDeletions = 0;
+            chatDeletions = 0;
+          }
+        })()
+      );
+
+      // Ensure we wait after every batch of 6 deletions
+      if (deletePromises.length >= 6) {
+        await Promise.all(deletePromises);
+        deletePromises.length = 0;
       }
+    }
+
+    // Wait for any remaining deletions
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
     }
 
     const remainingUsers = await new Promise((resolve, reject) => {
