@@ -8,41 +8,41 @@ const api_secret = process.env.STREAM_API_SECRET;
 const app_id = process.env.STREAM_APP_ID;
 
 const deleteUsers = async (userIds, cb) => {
-  // const feedClient = connect(api_key, api_secret, app_id, {
-  //   location: "us-east",
-  // });
+  const feedClient = connect(api_key, api_secret, app_id, {
+    location: "us-east",
+  });
 
-  // const chatClient = StreamChat.getInstance(api_key, api_secret);
+  const chatClient = StreamChat.getInstance(api_key, api_secret);
 
-  // let feedError = null;
-  // let chatError = null;
-  // let dbError = null;
+  let feedError = null;
+  let chatError = null;
+  let dbError = null;
 
-  // let feedSuccess = false;
-  // let chatSuccess = false;
-  // let dbSuccess = false;
+  let feedSuccess = false;
+  let chatSuccess = false;
+  let dbSuccess = false;
 
-  // try {
-  //   // Attempt to delete users from the chat database
-  //   await chatClient.deleteUsers(userIds, {
-  //     hard_delete: true,
-  //     mark_messages_deleted: true,
-  //     delete_conversation_channels: true,
-  //   });
-  //   chatSuccess = true;
-  // } catch (error) {
-  //   chatError = error;
-  // }
+  try {
+    // Attempt to delete users from the chat database
+    await chatClient.deleteUsers(userIds, {
+      hard_delete: true,
+      mark_messages_deleted: true,
+      delete_conversation_channels: true,
+    });
+    chatSuccess = true;
+  } catch (error) {
+    chatError = error;
+  }
 
-  // try {
-  //   // Attempt to delete users from the feed database
-  //   for (const userId of userIds) {
-  //     await feedClient.user(userId).delete();
-  //   }
-  //   feedSuccess = true;
-  // } catch (error) {
-  //   feedError = error;
-  // }
+  try {
+    // Attempt to delete users from the feed database
+    for (const userId of userIds) {
+      await feedClient.user(userId).delete();
+    }
+    feedSuccess = true;
+  } catch (error) {
+    feedError = error;
+  }
 
   try {
     // Attempt to delete users from the local database
@@ -54,11 +54,11 @@ const deleteUsers = async (userIds, cb) => {
       } else {
         dbSuccess = true;
       }
-      // generateLogMessage();
+      generateLogMessage();
     });
   } catch (error) {
     dbError = error;
-    // generateLogMessage();
+    generateLogMessage();
   }
 
   function generateLogMessage() {
@@ -112,7 +112,7 @@ const deleteUsers = async (userIds, cb) => {
 
 // restoreUser(userId);
 
-const usersToDelete = ["5ba1e24a-0ef1-408e-8851-808c6af0fda5"];
+const usersToDelete = ["35a8c0f2-f478-4a9e-a448-365d388401aa"];
 deleteUsers(usersToDelete, (err, result) => {
   if (err) {
     console.error("Errors encountered while deleting users:", err);

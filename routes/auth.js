@@ -1,7 +1,5 @@
 const express = require("express");
-const passport = require("passport");
 const { OAuth2Client } = require("google-auth-library");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const db = require("../db");
 const {
   signup,
@@ -14,47 +12,6 @@ const {
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `${process.env.API_ENDPOINT}/auth/google/callback`,
-    },
-    async (accessToken, refreshToken, profile, done) => {
-      const { id: googleId, emails, displayName: name } = profile;
-      const email = emails[0].value;
-
-      try {
-        await findOrCreateUser({ googleId, email, name }, done);
-      } catch (err) {
-        return done(err);
-      }
-    }
-  )
-);
-
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((obj, done) => {
-  done(null, obj);
-});
-
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-
-router.get(
-  "/google/callback",
-  passport.authenticate("google", { failureRedirect: "/" }),
-  (req, res) => {
-    res.redirect("/home");
-  }
-);
-
 router.post("/google", async (req, res) => {
   const { tokenId } = req.body;
   try {
@@ -63,9 +20,9 @@ router.post("/google", async (req, res) => {
       audience: process.env.GOOGLE_CLIENT_ID,
     });
     const payload = ticket.getPayload();
-    const { sub: googleId, email, name } = payload;
+    const { sub: googleId, email, name, picture: profileImage } = payload;
 
-    await findOrCreateUser({ googleId, email, name }, res);
+    await findOrCreateUser({ googleId, email, name, profileImage }, res);
   } catch (error) {
     console.error("Google login error:", error);
     res.status(401).json({ message: "Google authentication failed" });

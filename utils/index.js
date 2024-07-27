@@ -39,7 +39,16 @@ const verifyUser = (username, password, cb) => {
   );
 };
 
-const registerUser = (id, userId, username, password, email, name, cb) => {
+const registerUser = (
+  id,
+  userId,
+  username,
+  password,
+  email,
+  name,
+  profile,
+  cb
+) => {
   try {
     const lowercasedUsername = username.toLowerCase();
     const lowercasedUserId = userId.toLowerCase();
@@ -48,7 +57,7 @@ const registerUser = (id, userId, username, password, email, name, cb) => {
     const hashed_password = bcrypt.hashSync(password, salt);
 
     const sql =
-      "INSERT INTO users (id, userId, username, hashed_password, salt, email, name) VALUES (?,?,?,?,?,?,?)";
+      "INSERT INTO users (id, userId, username, hashed_password, salt, email, name, profile) VALUES (?,?,?,?,?,?,?,?)";
     const params = [
       lowercasedId,
       lowercasedUserId,
@@ -57,6 +66,7 @@ const registerUser = (id, userId, username, password, email, name, cb) => {
       salt,
       email,
       name,
+      JSON.stringify(profile),
     ];
     db.run(sql, params, function (err) {
       if (err) {
@@ -70,6 +80,7 @@ const registerUser = (id, userId, username, password, email, name, cb) => {
           salt,
           email,
           name,
+          profile,
         });
       }
     });
@@ -97,7 +108,7 @@ const signupHandler = async (error, result, res) => {
     res.status(500).json({ message: error });
     return;
   }
-  const { username, userId, id, name, email = "" } = result;
+  const { username, userId, id, name, email = "", profile } = result;
   const lowercasedUsername = username.toLowerCase();
   const lowercasedUserId = userId.toLowerCase();
   const lowercasedId = id.toLowerCase();
@@ -113,6 +124,7 @@ const signupHandler = async (error, result, res) => {
       name: name || username,
       username: lowercasedUsername,
       email,
+      profile,
     });
 
     const user = await feedClient.user(lowercasedId).create({
@@ -121,6 +133,7 @@ const signupHandler = async (error, result, res) => {
       name: name || username,
       username: lowercasedUsername,
       email,
+      profile,
     });
 
     const userFeed = feedClient.feed("user", lowercasedId);
@@ -147,6 +160,7 @@ const signupHandler = async (error, result, res) => {
         name: name || username,
         username: lowercasedUsername,
         email,
+        profile,
       },
     });
   } catch (error) {
@@ -165,7 +179,7 @@ const loginHandler = async (error, result, res) => {
     res.status(500).json({ message: error });
     return;
   }
-  const { username, id, userId, name } = result;
+  const { username, id, userId, name, profile } = result;
   const lowercasedUsername = username.toLowerCase();
   const lowercasedUserId = userId.toLowerCase();
   const lowercasedId = id.toLowerCase();
@@ -194,6 +208,7 @@ const loginHandler = async (error, result, res) => {
         userId: lowercasedUserId,
         id: lowercasedId,
         name,
+        profile,
       },
     });
   } catch (error) {

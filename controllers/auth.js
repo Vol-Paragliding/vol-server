@@ -15,7 +15,8 @@ const {
 
 const signup = async (req, res) => {
   try {
-    const { identifier, password, email, userId, id, username, name } = req.body;
+    const { identifier, password, email, userId, id, username, name, profile } =
+      req.body;
 
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
     const emailToUse = isEmail ? identifier : email;
@@ -28,6 +29,7 @@ const signup = async (req, res) => {
       password,
       emailToUse,
       name,
+      profile,
       function (err, result) {
         signupHandler(err, result, res);
       }
@@ -235,7 +237,10 @@ const generateUniqueUsername = async () => {
   return username;
 };
 
-const findOrCreateUser = async ({ googleId, email, name }, res) => {
+const findOrCreateUser = async (
+  { googleId, email, name, profileImage },
+  res
+) => {
   try {
     const user = await new Promise((resolve, reject) => {
       db.get(
@@ -251,10 +256,14 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
     });
 
     if (user) {
-      const { id, userId, username, name } = user;
+      const { id, userId, username, name, profile } = user;
       try {
-        console.log(`Logging in existing user: ${username}`);
-        await loginHandler(null, { username, id, userId, name }, res);
+        const updatedProfile = profile ? JSON.parse(profile) : {};
+        await loginHandler(
+          null,
+          { username, id, userId, name, profile: updatedProfile },
+          res
+        );
       } catch (error) {
         console.error("Error logging in user:", error);
         res.status(500).json({ message: "Error logging in user" });
@@ -263,15 +272,52 @@ const findOrCreateUser = async ({ googleId, email, name }, res) => {
       const id = crypto.randomUUID();
       const userId = id;
       const username = await generateUniqueUsername();
+      const userProfile = {
+        bio: "",
+        location: "",
+        image: profileImage || "",
+        coverPhoto: "",
+        yearStartedFlying: "",
+        certifications: {
+          p: "",
+          h: "",
+          s: "",
+          t: "",
+        },
+        favoriteSites: [],
+        wings: [],
+        harnesses: [],
+        inReachSocial: "",
+        inReachEmail: "",
+        xContestProfile: "",
+        telegramUsername: "",
+      };
+
       const sql =
-        "INSERT INTO users (id, userId, username, name, email, googleId) VALUES (?,?,?,?,?,?)";
-      const params = [id, userId, username, name, email, googleId];
+        "INSERT INTO users (id, userId, username, name, email, googleId, profile) VALUES (?,?,?,?,?,?,?)";
+      const params = [
+        id,
+        userId,
+        username,
+        name,
+        email,
+        googleId,
+        JSON.stringify(userProfile),
+      ];
       await new Promise((resolve, reject) => {
         db.run(sql, params, async (err) => {
           if (err) {
             return reject(err);
           }
-          const newUser = { id, userId, username, name, email, googleId };
+          const newUser = {
+            id,
+            userId,
+            username,
+            name,
+            email,
+            googleId,
+            profile: userProfile,
+          };
 
           try {
             await signupHandler(null, newUser, res);
