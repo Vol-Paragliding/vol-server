@@ -140,8 +140,8 @@ const signupHandler = async (error, result, res) => {
     await userFeed.addActivity({
       actor: user,
       verb: "signup",
-      object: `${user.id} has signed up! 🎉🎉🎉`,
-      text: `${user.id} has signed up! 🎉🎉🎉`,
+      object: `${user.username} has signed up! 🎉🎉🎉`,
+      text: `${user.username} has signed up! 🎉🎉🎉`,
     });
 
     const timelineFeed = feedClient.feed("timeline", lowercasedId);

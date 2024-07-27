@@ -1,8 +1,5 @@
-const jwt = require("jsonwebtoken");
-const db = require("../db");
-const crypto = require("crypto");
 const { uniqueNamesGenerator, Config } = require("unique-names-generator");
-
+const db = require("../db");
 const {
   loginHandler,
   registerUser,
@@ -12,6 +9,11 @@ const {
   searchUsersHandler,
   deleteUser,
 } = require("../utils");
+
+const generateUniqueId = async () => {
+  const { nanoid } = await import("nanoid");
+  return nanoid();
+};
 
 const signup = async (req, res) => {
   try {
@@ -269,7 +271,7 @@ const findOrCreateUser = async (
         res.status(500).json({ message: "Error logging in user" });
       }
     } else {
-      const id = crypto.randomUUID();
+      const id = await generateUniqueId();
       const userId = id;
       const username = await generateUniqueUsername();
       const userProfile = {
