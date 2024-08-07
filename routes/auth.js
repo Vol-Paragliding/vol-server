@@ -7,6 +7,7 @@ const {
   users,
   deleteUser,
   findOrCreateUser,
+  updateUserProfileImage,
 } = require("../controllers/auth");
 
 const router = express.Router();
@@ -134,6 +135,23 @@ router.post("/update-profile", async (req, res) => {
   } catch (error) {
     console.error("Error updating user profile:", error);
     res.status(500).json({ message: "Error updating user profile" });
+  }
+});
+
+router.post("/update-profile-image", async (req, res) => {
+  const { userId, imageUrl } = req.body;
+
+  if (!userId || !imageUrl) {
+    return res
+      .status(400)
+      .json({ message: "User ID and image URL are required" });
+  }
+
+  try {
+    const result = await updateUserProfileImage(userId, imageUrl);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: "Error updating profile image" });
   }
 });
 

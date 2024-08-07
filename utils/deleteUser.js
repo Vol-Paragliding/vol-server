@@ -112,7 +112,7 @@ const deleteUsers = async (userIds, cb) => {
 
 // restoreUser(userId);
 
-const usersToDelete = ["35a8c0f2-f478-4a9e-a448-365d388401aa"];
+const usersToDelete = ["LKKwZse9ngNWzArq86q4f"];
 deleteUsers(usersToDelete, (err, result) => {
   if (err) {
     console.error("Errors encountered while deleting users:", err);

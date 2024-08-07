@@ -132,8 +132,8 @@ const signupHandler = async (error, result, res) => {
     await userFeed.addActivity({
       actor: user,
       verb: "signup",
-      object: `${user.username} has signed up! 🎉🎉🎉`,
-      text: `${user.username} has signed up! 🎉🎉🎉`,
+      object: `${username} has signed up! 🎉🎉🎉`,
+      text: `${username} has signed up! 🎉🎉🎉`,
     });
 
     const timelineFeed = feedClient.feed("timeline", id);
@@ -203,6 +203,97 @@ const loginHandler = async (error, result, res) => {
   } catch (error) {
     console.error("Error in loginHandler 2:", error);
     res.status(500).json({ message: "Error querying user in Stream Chat" });
+  }
+};
+
+const updateUserProfileImage = async (userId, imageUrl) => {
+  try {
+    // Fetch the current profile JSON string from the SQLite database
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT profile FROM users WHERE id = ?", [userId], (err, row) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Parse the profile JSON string
+    let profile;
+    try {
+      profile = JSON.parse(user.profile || "{}");
+    } catch (error) {
+      throw new Error("Malformed profile JSON in database", error);
+    }
+
+    // Update the image URL in the profile object
+    profile.image = imageUrl;
+
+    // Update the profile JSON string in the SQLite database
+    await new Promise((resolve, reject) => {
+      db.run(
+        "UPDATE users SET profile = ? WHERE id = ?",
+        [JSON.stringify(profile), userId],
+        (err) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve();
+        }
+      );
+    });
+
+    // Update the feed database
+    const feedClient = connect(api_key, api_secret, app_id, {
+      location: "us-east",
+    });
+    const currentUserData = await feedClient.user(userId).get();
+
+    // Merge existing profile with the new image URL
+    const updatedProfile = {
+      ...currentUserData.data.profile,
+      image: imageUrl,
+    };
+
+    await feedClient.user(userId).update({
+      ...currentUserData.data,
+      profile: updatedProfile,
+    });
+
+    // Update the chat database
+    const chatClient = StreamChat.getInstance(api_key, api_secret);
+
+    // Fetch the chat user data
+    const { users } = await chatClient.queryUsers({
+      id: { $eq: userId },
+    });
+
+    if (!users.length) {
+      throw new Error("User not found in chat database");
+    }
+
+    const chatUser = users[0];
+
+    // Merge existing chat user profile with the new image URL
+    const updatedChatUserProfile = {
+      ...chatUser.profile,
+      image: imageUrl,
+    };
+
+    // Update the chat user data with the new image URL
+    await chatClient.upsertUser({
+      ...chatUser,
+      profile: updatedChatUserProfile,
+    });
+
+    return { message: "Profile image updated successfully" };
+  } catch (error) {
+    console.error("Error updating profile image:", error);
+    throw error;
   }
 };
 
@@ -303,6 +394,7 @@ module.exports = {
   registerUser,
   signupHandler,
   searchUsersHandler,
+  updateUserProfileImage,
   searchUsers,
   deleteUser,
 };
