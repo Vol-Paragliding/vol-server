@@ -1,27 +1,16 @@
 const sqlite3 = require("sqlite3");
 const mkdirp = require("mkdirp");
 const crypto = require("crypto");
-const path = require("path");
 require("dotenv").config();
 
 const dbPath =
   process.env.NODE_ENV === "production"
-    ? path.resolve(__dirname, "../var/db/prod_vol.db")
-    : path.resolve(__dirname, "../var/db/dev_vol.db");
+    ? process.env.PROD_DATABASE_URL
+    : process.env.DEV_DATABASE_URL;
 
-// Ensure the directory exists
-mkdirp.sync(path.dirname(dbPath));
+mkdirp.sync(require("path").dirname(dbPath));
 
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error(`Error opening database: ${err.message}`);
-  } else {
-    console.log(`Database connected: ${dbPath}`);
-  }
-});
-
-console.log("Environment:", process.env.NODE_ENV);
-console.log("Database Path:", dbPath);
+const db = new sqlite3.Database(dbPath);
 
 const createTable = () => {
   db.run(
@@ -70,6 +59,7 @@ const createInitialUser = () => {
   }
 };
 
+// Function to ensure new columns exist
 const columns = [{ name: "profile", type: "TEXT" }];
 
 function columnExists(columnName, callback) {
