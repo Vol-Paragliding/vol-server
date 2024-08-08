@@ -22,7 +22,6 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const deleteUserScript = async () => {
   try {
     console.log("Environment:", process.env.NODE_ENV);
-    console.log("Database Path:", dbPath);
     console.log("API Key:", api_key);
     console.log("API Secret:", api_secret);
     console.log("App ID:", app_id);
