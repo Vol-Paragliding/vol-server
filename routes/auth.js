@@ -7,6 +7,7 @@ const {
   users,
   deleteUser,
   findOrCreateUser,
+  updateProfile,
   updateUserProfileImage,
 } = require("../controllers/auth");
 
@@ -98,43 +99,11 @@ router.post("/update-profile", async (req, res) => {
     return res.status(400).json({ message: "User ID is required" });
   }
 
-  const updateFields = [];
-  const params = [];
-
-  Object.keys(updates).forEach((field) => {
-    if (updates[field] !== undefined) {
-      updateFields.push(`${field} = ?`);
-      params.push(updates[field]);
-    }
-  });
-
-  if (updateFields.length === 0) {
-    return res.status(400).json({ message: "No valid fields to update" });
-  }
-
-  params.push(id);
-
-  const sql = `
-    UPDATE users
-    SET ${updateFields.join(", ")}
-    WHERE id = ?
-  `;
-
   try {
-    await new Promise((resolve, reject) => {
-      db.run(sql, params, function (err) {
-        if (err) {
-          return reject(err);
-        }
-        resolve(this);
-      });
-    });
-    res
-      .status(200)
-      .json({ message: "Profile updated successfully", user: req.body });
+    const result = await updateProfile(id, updates);
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Error updating user profile:", error);
-    res.status(500).json({ message: "Error updating user profile" });
+    res.status(500).json({ message: "Error updating profile" });
   }
 });
 

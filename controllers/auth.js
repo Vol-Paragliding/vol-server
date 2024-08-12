@@ -5,6 +5,7 @@ const {
   registerUser,
   signupHandler,
   verifyUser,
+  updateProfile,
   updateUserProfileImage,
   searchUsers,
   searchUsersHandler,
@@ -179,5 +180,6 @@ module.exports = {
   users,
   deleteUser,
   findOrCreateUser,
+  updateProfile,
   updateUserProfileImage,
 };

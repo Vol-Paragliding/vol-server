@@ -206,6 +206,103 @@ const loginHandler = async (error, result, res) => {
   }
 };
 
+const updateProfile = async (userId, updates) => {
+  try {
+    const user = await new Promise((resolve, reject) => {
+      db.get("SELECT profile FROM users WHERE id = ?", [userId], (err, row) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(row);
+      });
+    });
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    let profile;
+    try {
+      profile = JSON.parse(user.profile || "{}");
+    } catch (error) {
+      console.log('user.profile', user.profile);
+      console.log('profile', profile);
+      throw new Error("Malformed profile JSON in database", error);
+    }
+
+    const updatedProfile = {
+      ...profile,
+      ...updates.profile,
+    };
+
+    await new Promise((resolve, reject) => {
+      db.run(
+        "UPDATE users SET profile = ?, username = ?, email = ?, name = ? WHERE id = ?",
+        [
+          JSON.stringify(updatedProfile),
+          updates.username,
+          updates.email,
+          updates.name,
+          userId,
+        ],
+        (err) => {
+          if (err) {
+            return reject(err);
+          }
+          resolve();
+        }
+      );
+    });
+
+    const feedClient = connect(api_key, api_secret, app_id, {
+      location: "us-east",
+    });
+    const currentUserData = await feedClient.user(userId).get();
+
+    const updatedFeedProfile = {
+      ...currentUserData.data.profile,
+      ...updates.profile,
+    };
+
+    await feedClient.user(userId).update({
+      ...currentUserData.data,
+      username: updates.username,
+      email: updates.email,
+      name: updates.name,
+      profile: updatedFeedProfile,
+    });
+
+    const chatClient = StreamChat.getInstance(api_key, api_secret);
+    const { users } = await chatClient.queryUsers({
+      id: { $eq: userId },
+    });
+
+    if (!users.length) {
+      throw new Error("User not found in chat database");
+    }
+
+    const chatUser = users[0];
+
+    const updatedChatUserProfile = {
+      ...chatUser.profile,
+      ...updates.profile,
+    };
+
+    await chatClient.upsertUser({
+      ...chatUser,
+      username: updates.username,
+      email: updates.email,
+      name: updates.name,
+      profile: updatedChatUserProfile,
+    });
+
+    return { message: "Profile updated successfully" };
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    throw error;
+  }
+};
+
 const updateUserProfileImage = async (userId, imageUrl) => {
   try {
     // Fetch the current profile JSON string from the SQLite database
@@ -394,6 +491,7 @@ module.exports = {
   registerUser,
   signupHandler,
   searchUsersHandler,
+  updateProfile,
   updateUserProfileImage,
   searchUsers,
   deleteUser,
