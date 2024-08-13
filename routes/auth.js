@@ -14,6 +14,20 @@ const {
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+router.post("/check-user", async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const user = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json({ user: user.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: "Error checking user" });
+  }
+});
+
 router.post("/google", async (req, res) => {
   const { tokenId } = req.body;
   try {
