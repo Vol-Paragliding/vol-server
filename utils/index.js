@@ -16,28 +16,28 @@ const app_id = isProduction
   ? process.env.PROD_STREAM_APP_ID
   : process.env.STREAM_APP_ID;
 
-const verifyUser = (username, password, cb) => {
-  db.get(
-    "SELECT * FROM users WHERE username = ?",
-    [username],
-    function (err, row) {
-      if (err) {
-        return cb(err);
-      }
-      if (!row) {
-        return cb("User with this username doesn't exist.");
-      }
-      const hashed_password = bcrypt.hashSync(password, row.salt);
-      if (hashed_password === row.hashed_password) {
-        cb(null, row);
-      } else {
-        return cb("Incorrect Password.");
-      }
+const verifyUser = async (username, password, cb) => {
+  try {
+    const sql = "SELECT * FROM users WHERE username = $1";
+    const result = await db.query(sql, [username]);
+
+    if (result.rows.length === 0) {
+      return cb("User with this username doesn't exist.");
     }
-  );
+
+    const user = result.rows[0];
+    const hashed_password = bcrypt.hashSync(password, user.salt);
+    if (hashed_password === user.hashed_password) {
+      cb(null, user);
+    } else {
+      return cb("Incorrect Password.");
+    }
+  } catch (err) {
+    return cb(err);
+  }
 };
 
-const registerUser = (
+const registerUser = async (
   id,
   userId,
   username,
@@ -52,7 +52,7 @@ const registerUser = (
     const hashed_password = bcrypt.hashSync(password, salt);
 
     const sql =
-      "INSERT INTO users (id, userId, username, hashed_password, salt, email, name, profile) VALUES (?,?,?,?,?,?,?,?)";
+      "INSERT INTO users (id, userId, username, hashed_password, salt, email, name, profile) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)";
     const params = [
       id,
       userId,
@@ -61,41 +61,37 @@ const registerUser = (
       salt,
       email,
       name,
-      JSON.stringify(profile),
+      profile,
     ];
-    db.run(sql, params, function (err) {
-      if (err) {
-        cb(err, null);
-      } else {
-        cb(null, {
-          id,
-          userId,
-          username,
-          hashed_password,
-          salt,
-          email,
-          name,
-          profile,
-        });
-      }
+
+    await db.query(sql, params);
+    cb(null, {
+      id,
+      userId,
+      username,
+      hashed_password,
+      salt,
+      email,
+      name,
+      profile,
     });
   } catch (err) {
     cb(err, null);
   }
 };
 
-const searchUsers = (searchTerm, selfUserId, cb) => {
-  const lowercasedSearchTerm = searchTerm.toLowerCase();
-  const sql =
-    "SELECT id, username FROM users WHERE LOWER(username) LIKE ? AND id != ?";
-  const params = ["%" + lowercasedSearchTerm + "%", selfUserId];
-  db.all(sql, params, function (err, innerResult) {
-    if (err) {
-      cb(err, innerResult);
-    } else {
-      cb(null, innerResult);
-    }
-  });
+const searchUsers = async (searchTerm, selfUserId, cb) => {
+  try {
+    const lowercasedSearchTerm = searchTerm.toLowerCase();
+    const sql =
+      "SELECT id, username FROM users WHERE LOWER(username) LIKE $1 AND id != $2";
+    const params = [`%${lowercasedSearchTerm}%`, selfUserId];
+
+    const result = await db.query(sql, params);
+    cb(null, result.rows);
+  } catch (err) {
+    cb(err, []);
+  }
 };
 
 const signupHandler = async (error, result, res) => {
@@ -208,51 +204,33 @@ const loginHandler = async (error, result, res) => {
 
 const updateProfile = async (userId, updates) => {
   try {
-    const user = await new Promise((resolve, reject) => {
-      db.get("SELECT profile FROM users WHERE id = ?", [userId], (err, row) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(row);
-      });
-    });
+    const userResult = await db.query(
+      "SELECT profile FROM users WHERE id = $1",
+      [userId]
+    );
 
-    if (!user) {
+    if (userResult.rows.length === 0) {
       throw new Error("User not found");
     }
 
-    let profile;
-    try {
-      profile = JSON.parse(user.profile || "{}");
-    } catch (error) {
-      console.log('user.profile', user.profile);
-      console.log('profile', profile);
-      throw new Error("Malformed profile JSON in database", error);
-    }
+    const user = userResult.rows[0];
+    const profile = user.profile || {};
 
     const updatedProfile = {
       ...profile,
       ...updates.profile,
     };
 
-    await new Promise((resolve, reject) => {
-      db.run(
-        "UPDATE users SET profile = ?, username = ?, email = ?, name = ? WHERE id = ?",
-        [
-          JSON.stringify(updatedProfile),
-          updates.username,
-          updates.email,
-          updates.name,
-          userId,
-        ],
-        (err) => {
-          if (err) {
-            return reject(err);
-          }
-          resolve();
-        }
-      );
-    });
+    await db.query(
+      "UPDATE users SET profile = $1, username = $2, email = $3, name = $4 WHERE id = $5",
+      [
+        updatedProfile,
+        updates.username,
+        updates.email,
+        updates.name,
+        userId,
+      ]
+    );
 
     const feedClient = connect(api_key, api_secret, app_id, {
       location: "us-east",
@@ -305,44 +283,27 @@ const updateProfile = async (userId, updates) => {
 
 const updateUserProfileImage = async (userId, imageUrl) => {
   try {
-    // Fetch the current profile JSON string from the SQLite database
-    const user = await new Promise((resolve, reject) => {
-      db.get("SELECT profile FROM users WHERE id = ?", [userId], (err, row) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(row);
-      });
-    });
+    // Fetch the current profile JSON string from the PostgreSQL database
+    const userResult = await db.query(
+      "SELECT profile FROM users WHERE id = $1",
+      [userId]
+    );
 
-    if (!user) {
+    if (userResult.rows.length === 0) {
       throw new Error("User not found");
     }
 
-    // Parse the profile JSON string
-    let profile;
-    try {
-      profile = JSON.parse(user.profile || "{}");
-    } catch (error) {
-      throw new Error("Malformed profile JSON in database", error);
-    }
+    const user = userResult.rows[0];
+    const profile = user.profile || {};
 
     // Update the image URL in the profile object
     profile.image = imageUrl;
 
-    // Update the profile JSON string in the SQLite database
-    await new Promise((resolve, reject) => {
-      db.run(
-        "UPDATE users SET profile = ? WHERE id = ?",
-        [JSON.stringify(profile), userId],
-        (err) => {
-          if (err) {
-            return reject(err);
-          }
-          resolve();
-        }
-      );
-    });
+    // Update the profile JSON string in the PostgreSQL database
+    await db.query("UPDATE users SET profile = $1 WHERE id = $2", [
+      profile,
+      userId,
+    ]);
 
     // Update the feed database
     const feedClient = connect(api_key, api_secret, app_id, {
@@ -350,7 +311,6 @@ const updateUserProfileImage = async (userId, imageUrl) => {
     });
     const currentUserData = await feedClient.user(userId).get();
 
-    // Merge existing profile with the new image URL
     const updatedProfile = {
       ...currentUserData.data.profile,
       image: imageUrl,
@@ -364,7 +324,6 @@ const updateUserProfileImage = async (userId, imageUrl) => {
     // Update the chat database
     const chatClient = StreamChat.getInstance(api_key, api_secret);
 
-    // Fetch the chat user data
     const { users } = await chatClient.queryUsers({
       id: { $eq: userId },
     });
@@ -375,13 +334,11 @@ const updateUserProfileImage = async (userId, imageUrl) => {
 
     const chatUser = users[0];
 
-    // Merge existing chat user profile with the new image URL
     const updatedChatUserProfile = {
       ...chatUser.profile,
       image: imageUrl,
     };
 
-    // Update the chat user data with the new image URL
     await chatClient.upsertUser({
       ...chatUser,
       profile: updatedChatUserProfile,
@@ -434,16 +391,11 @@ const deleteUser = async (req, res) => {
   }
 
   try {
-    // Delete user from the local database
-    const sql = "DELETE FROM users WHERE id = ?";
-    db.run(sql, [userId], function (err) {
-      if (err) {
-        dbError = err;
-      } else {
-        dbSuccess = true;
-      }
-      generateLogMessage();
-    });
+    // Delete user from the PostgreSQL database
+    const sql = "DELETE FROM users WHERE id = $1";
+    await db.query(sql, [userId]);
+    dbSuccess = true;
+    generateLogMessage();
   } catch (error) {
     dbError = error;
     generateLogMessage();

@@ -1,4 +1,4 @@
-const { uniqueNamesGenerator, Config } = require("unique-names-generator");
+const { uniqueNamesGenerator } = require("unique-names-generator");
 const db = require("../db");
 
 const adjectives = [
@@ -114,34 +114,34 @@ const generateUniqueUsername = async () => {
   let username =
     uniqueNamesGenerator(config) + Math.floor(100 + Math.random() * 900);
 
-  let exists = await new Promise((resolve, reject) => {
-    db.get(
-      "SELECT COUNT(*) as count FROM users WHERE username = ?",
-      [username],
-      (err, row) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(row.count > 0);
-      }
-    );
-  });
+  const checkUsernameExists = async (username) => {
+    try {
+      const res = await db.query(
+        "SELECT COUNT(*) as count FROM users WHERE username = $1",
+        [username]
+      );
+      return res.rows[0].count > 0;
+    } catch (err) {
+      throw new Error("Error querying database for username uniqueness.");
+    }
+  };
 
-  while (exists) {
+  let exists = await checkUsernameExists(username);
+
+  let attempt = 0;
+  const maxAttempts = 10;
+
+  while (exists && attempt < maxAttempts) {
     username =
       uniqueNamesGenerator(config) + Math.floor(100 + Math.random() * 900);
-    exists = await new Promise((resolve, reject) => {
-      db.get(
-        "SELECT COUNT(*) as count FROM users WHERE username = ?",
-        [username],
-        (err, row) => {
-          if (err) {
-            return reject(err);
-          }
-          resolve(row.count > 0);
-        }
-      );
-    });
+    exists = await checkUsernameExists(username);
+    attempt++;
+  }
+
+  if (exists) {
+    throw new Error(
+      "Unable to generate a unique username after multiple attempts"
+    );
   }
 
   return username;

@@ -45,17 +45,12 @@ const deleteUsers = async (userIds, cb) => {
   }
 
   try {
-    // Attempt to delete users from the local database
-    const placeholders = userIds.map(() => "?").join(",");
+    // Attempt to delete users from the local database (PostgreSQL)
+    const placeholders = userIds.map((_, i) => `$${i + 1}`).join(",");
     const sql = `DELETE FROM users WHERE id IN (${placeholders})`;
-    db.run(sql, userIds, function (err) {
-      if (err) {
-        dbError = err;
-      } else {
-        dbSuccess = true;
-      }
-      generateLogMessage();
-    });
+    await db.query(sql, userIds);
+    dbSuccess = true;
+    generateLogMessage();
   } catch (error) {
     dbError = error;
     generateLogMessage();
@@ -112,7 +107,7 @@ const deleteUsers = async (userIds, cb) => {
 
 // restoreUser(userId);
 
-const usersToDelete = ["LKKwZse9ngNWzArq86q4f"];
+const usersToDelete = ["-43Z5RZsZcfpTc-usuA-q"];
 deleteUsers(usersToDelete, (err, result) => {
   if (err) {
     console.error("Errors encountered while deleting users:", err);

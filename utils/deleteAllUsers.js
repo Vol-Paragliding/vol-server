@@ -30,14 +30,14 @@ const deleteUserScript = async () => {
     const chatClient = StreamChat.getInstance(api_key, api_secret);
 
     const usersToDelete = await new Promise((resolve, reject) => {
-      db.all(
-        "SELECT id FROM users WHERE id != ?",
+      db.query(
+        "SELECT id FROM users WHERE id != $1",
         [excludedUserId],
-        (err, rows) => {
+        (err, res) => {
           if (err) {
             return reject(err);
           }
-          resolve(rows.map((row) => row.id));
+          resolve(res.rows.map((row) => row.id));
         }
       );
     });
@@ -73,13 +73,13 @@ const deleteUserScript = async () => {
             );
           }
 
-          db.run("DELETE FROM users WHERE id = ?", [userId], (err) => {
+          db.query("DELETE FROM users WHERE id = $1", [userId], (err) => {
             if (err) {
               console.error(
-                `Failed to delete user ${userId} from SQLite: ${err.message}`
+                `Failed to delete user ${userId} from PostgreSQL: ${err.message}`
               );
             } else {
-              console.log(`Deleted user ${userId} from SQLite`);
+              console.log(`Deleted user ${userId} from PostgreSQL`);
             }
           });
 
@@ -104,11 +104,11 @@ const deleteUserScript = async () => {
     }
 
     const remainingUsers = await new Promise((resolve, reject) => {
-      db.all("SELECT id FROM users", (err, rows) => {
+      db.query("SELECT id FROM users", (err, res) => {
         if (err) {
           return reject(err);
         }
-        resolve(rows.map((row) => row.id));
+        resolve(res.rows.map((row) => row.id));
       });
     });
 

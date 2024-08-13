@@ -37,18 +37,11 @@ router.post("/check-availability", async (req, res) => {
 
   try {
     const query = isEmail
-      ? "SELECT * FROM users WHERE email = ?"
-      : "SELECT * FROM users WHERE username = ?";
-    const result = await new Promise((resolve, reject) => {
-      db.get(query, [identifier], (err, row) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(row);
-      });
-    });
+      ? "SELECT * FROM users WHERE email = $1"
+      : "SELECT * FROM users WHERE username = $1";
+    const result = await db.query(query, [identifier]);
 
-    if (result) {
+    if (result.rows.length > 0) {
       res.status(409).json({
         message: isEmail ? "Email already exists" : "Username already exists",
       });
@@ -67,19 +60,10 @@ router.post("/get-user-id", async (req, res) => {
   const { username } = req.body;
 
   try {
-    const userId = await new Promise((resolve, reject) => {
-      const sql = "SELECT id FROM users WHERE username = ?";
-      db.get(sql, [username], (err, row) => {
-        if (err) {
-          return reject(err);
-        }
-        if (row) {
-          resolve(row.id);
-        } else {
-          resolve(null);
-        }
-      });
-    });
+    const sql = "SELECT id FROM users WHERE username = $1";
+    const result = await db.query(sql, [username]);
+
+    const userId = result.rows.length > 0 ? result.rows[0].id : null;
 
     if (userId === null) {
       return res.status(404).json({ message: "User not found" });

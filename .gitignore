@@ -28,3 +28,4 @@ node_modules/
 *.env
 /var/db/*.db
 
+pg_data/
