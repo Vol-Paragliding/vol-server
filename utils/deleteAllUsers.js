@@ -17,8 +17,6 @@ const app_id = isProduction
 
 const excludedUserId = "zacheryconverse";
 
-const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const deleteUserScript = async () => {
   try {
     console.log("Environment:", process.env.NODE_ENV);
@@ -29,89 +27,50 @@ const deleteUserScript = async () => {
     const feedClient = connect(api_key, api_secret, app_id);
     const chatClient = StreamChat.getInstance(api_key, api_secret);
 
-    const usersToDelete = await new Promise((resolve, reject) => {
-      db.query(
-        "SELECT id FROM users WHERE id != $1",
-        [excludedUserId],
-        (err, res) => {
-          if (err) {
-            return reject(err);
-          }
-          resolve(res.rows.map((row) => row.id));
-        }
-      );
-    });
+    console.log("Before querying users to delete.");
+
+    // Fetch users to delete from the database
+    const result = await db.query("SELECT id FROM users WHERE id != $1", [
+      excludedUserId,
+    ]);
+    const usersToDelete = result.rows.map((row) => row.id);
 
     console.log("User IDs to delete:", usersToDelete);
 
     let feedDeletions = 0;
     let chatDeletions = 0;
-    const deletePromises = [];
 
     for (const userId of usersToDelete) {
-      deletePromises.push(
-        (async () => {
-          try {
-            await feedClient.user(userId).delete();
-            console.log(`Deleted user ${userId} from Feed`);
-            feedDeletions++;
-          } catch (error) {
-            console.error(
-              `Failed to delete user ${userId} from Feed: ${error.message}`
-            );
-          }
+      try {
+        // Delete from Feed
+        await feedClient.user(userId).delete();
+        console.log(`Deleted user ${userId} from Feed`);
+        feedDeletions++;
 
-          try {
-            await chatClient.deleteUser(userId, {
-              mark_messages_deleted: true,
-            });
-            console.log(`Deleted user ${userId} from Chat`);
-            chatDeletions++;
-          } catch (error) {
-            console.error(
-              `Failed to delete user ${userId} from Chat: ${error.message}`
-            );
-          }
+        // Delete from Chat
+        await chatClient.deleteUser(userId, { mark_messages_deleted: true });
+        console.log(`Deleted user ${userId} from Chat`);
+        chatDeletions++;
 
-          db.query("DELETE FROM users WHERE id = $1", [userId], (err) => {
-            if (err) {
-              console.error(
-                `Failed to delete user ${userId} from PostgreSQL: ${err.message}`
-              );
-            } else {
-              console.log(`Deleted user ${userId} from PostgreSQL`);
-            }
-          });
+        // Delete from PostgreSQL
+        await db.query("DELETE FROM users WHERE id = $1", [userId]);
+        console.log(`Deleted user ${userId} from PostgreSQL`);
 
-          if (feedDeletions >= 6 || chatDeletions >= 6) {
-            await delay(60100); // 60.1 seconds
-            feedDeletions = 0;
-            chatDeletions = 0;
-          }
-        })()
-      );
-
-      // Ensure we wait after every batch of 6 deletions
-      if (deletePromises.length >= 6) {
-        await Promise.all(deletePromises);
-        deletePromises.length = 0;
+        // Pause if rate limit thresholds are reached
+        if (feedDeletions >= 6 || chatDeletions >= 6) {
+          console.log("Pausing for rate limits...");
+          await new Promise((resolve) => setTimeout(resolve, 60100)); // 60.1 seconds
+          feedDeletions = 0;
+          chatDeletions = 0;
+        }
+      } catch (error) {
+        console.error(`Error deleting user ${userId}: ${error.message}`);
       }
     }
 
-    // Wait for any remaining deletions
-    if (deletePromises.length > 0) {
-      await Promise.all(deletePromises);
-    }
-
-    const remainingUsers = await new Promise((resolve, reject) => {
-      db.query("SELECT id FROM users", (err, res) => {
-        if (err) {
-          return reject(err);
-        }
-        resolve(res.rows.map((row) => row.id));
-      });
-    });
-
+    // Check remaining users in the database
+    const remainingResult = await db.query("SELECT id FROM users");
+    const remainingUsers = remainingResult.rows.map((row) => row.id);
     console.log("Remaining user IDs:", remainingUsers);
   } catch (error) {
     console.error("Error executing delete user script:", error);
