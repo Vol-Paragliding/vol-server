@@ -46,9 +46,9 @@ const signup = async (req, res) => {
 
 const login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { identifier, password } = req.body;
 
-    verifyUser(username, password, (err, result) => {
+    verifyUser(identifier, password, (err, result) => {
       loginHandler(err, result, res);
     });
   } catch (error) {

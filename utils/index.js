@@ -16,16 +16,23 @@ const app_id = isProduction
   ? process.env.PROD_STREAM_APP_ID
   : process.env.STREAM_APP_ID;
 
-const verifyUser = async (username, password, cb) => {
+const verifyUser = async (identifier, password, cb) => {
   try {
-    const sql = "SELECT * FROM users WHERE username = $1";
-    const result = await db.query(sql, [username]);
+    const sql = "SELECT * FROM users WHERE username = $1 OR email = $1";
+    const result = await db.query(sql, [identifier]);
 
     if (result.rows.length === 0) {
-      return cb("User with this username doesn't exist.");
+      return cb("User with this username or email doesn't exist.");
     }
 
     const user = result.rows[0];
+
+    if (!user.salt || !user.hashed_password) {
+      return cb(
+        "This account was created using Google OAuth. Please log in using Google."
+      );
+    }
+
     const hashed_password = bcrypt.hashSync(password, user.salt);
     if (hashed_password === user.hashed_password) {
       cb(null, user);
@@ -33,7 +40,9 @@ const verifyUser = async (username, password, cb) => {
       return cb("Incorrect Password.");
     }
   } catch (err) {
-    return cb(err);
+    return cb(
+      "An error occurred while processing your login. Please try again later."
+    );
   }
 };
 
@@ -164,10 +173,10 @@ const signupHandler = async (error, result, res) => {
 const loginHandler = async (error, result, res) => {
   if (error) {
     console.error("Error in loginHandler:", error);
-    res.status(500).json({ message: error });
+    res.status(400).json({ message: error });
     return;
   }
-  const { username, id, userId, name, profile } = result;
+  const { username, email, id, userId, name, profile } = result;
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -190,6 +199,7 @@ const loginHandler = async (error, result, res) => {
       chatToken,
       user: {
         username,
+        email,
         userId,
         id,
         name,
@@ -197,8 +207,10 @@ const loginHandler = async (error, result, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in loginHandler 2:", error);
-    res.status(500).json({ message: "Error querying user in Stream Chat" });
+    console.error("Error in loginHandler:", error);
+    res
+      .status(500)
+      .json({ message: "An unexpected error occurred. Please try agin later" });
   }
 };
 
@@ -223,13 +235,7 @@ const updateProfile = async (userId, updates) => {
 
     await db.query(
       "UPDATE users SET profile = $1, username = $2, email = $3, name = $4 WHERE id = $5",
-      [
-        updatedProfile,
-        updates.username,
-        updates.email,
-        updates.name,
-        userId,
-      ]
+      [updatedProfile, updates.username, updates.email, updates.name, userId]
     );
 
     const feedClient = connect(api_key, api_secret, app_id, {
