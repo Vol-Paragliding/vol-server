@@ -29,18 +29,32 @@ const deleteUserScript = async () => {
 
     console.log("Before querying users to delete.");
 
-    // Fetch users to delete from the database
+    // Fetch all users from PostgreSQL database
     const result = await db.query("SELECT id FROM users WHERE id != $1", [
       excludedUserId,
     ]);
-    const usersToDelete = result.rows.map((row) => row.id);
+    const postgresUsers = result.rows.map((row) => row.id);
 
-    console.log("User IDs to delete:", usersToDelete);
+    console.log("PostgreSQL User IDs:", postgresUsers);
+
+    // Fetch all users from Chat
+    const chatUsers = await chatClient.queryUsers({});
+    const chatUserIds = chatUsers.users.map((user) => user.id);
+
+    console.log("Chat User IDs:", chatUserIds);
 
     let feedDeletions = 0;
     let chatDeletions = 0;
 
+    // Delete users from Chat and Feed who are not the excluded user
+    const usersToDelete = new Set([...postgresUsers, ...chatUserIds]);
+
     for (const userId of usersToDelete) {
+      if (userId === excludedUserId) {
+        console.log(`Skipping deletion of excluded user ${userId}`);
+        continue;
+      }
+
       try {
         // Delete from Feed
         await feedClient.user(userId).delete();
@@ -64,14 +78,16 @@ const deleteUserScript = async () => {
           chatDeletions = 0;
         }
       } catch (error) {
-        console.error(`Error deleting user ${userId}: ${error.message}`);
+        console.error(
+          `Error deleting user ${userId} from PostgreSQL, Chat, or Feed: ${error.message}`
+        );
       }
     }
 
-    // Check remaining users in the database
+    // Final log of remaining users in PostgreSQL
     const remainingResult = await db.query("SELECT id FROM users");
     const remainingUsers = remainingResult.rows.map((row) => row.id);
-    console.log("Remaining user IDs:", remainingUsers);
+    console.log("Remaining PostgreSQL user IDs:", remainingUsers);
   } catch (error) {
     console.error("Error executing delete user script:", error);
   }
