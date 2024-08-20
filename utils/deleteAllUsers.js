@@ -46,7 +46,7 @@ const deleteUserScript = async () => {
     let feedDeletions = 0;
     let chatDeletions = 0;
 
-    // Delete users from Chat and Feed who are not the excluded user
+    // Combine users from all sources and create a unique set
     const usersToDelete = new Set([...postgresUsers, ...chatUserIds]);
 
     for (const userId of usersToDelete) {
@@ -56,19 +56,43 @@ const deleteUserScript = async () => {
       }
 
       try {
-        // Delete from Feed
-        await feedClient.user(userId).delete();
-        console.log(`Deleted user ${userId} from Feed`);
-        feedDeletions++;
+        // Check if the user exists in Feed before deletion
+        const feedUserExists = await feedClient
+          .user(userId)
+          .get()
+          .then(() => true)
+          .catch(() => false);
 
-        // Delete from Chat
-        await chatClient.deleteUser(userId, { mark_messages_deleted: true });
-        console.log(`Deleted user ${userId} from Chat`);
-        chatDeletions++;
+        // Check if the user exists in Chat before deletion
+        const chatUserExists = await chatClient
+          .queryUsers({ id: { $eq: userId } })
+          .then((res) => res.users.length > 0);
 
-        // Delete from PostgreSQL
-        await db.query("DELETE FROM users WHERE id = $1", [userId]);
-        console.log(`Deleted user ${userId} from PostgreSQL`);
+        // Delete from Feed if exists
+        if (feedUserExists) {
+          await feedClient.user(userId).delete();
+          console.log(`Deleted user ${userId} from Feed`);
+          feedDeletions++;
+        } else {
+          console.log(`User ${userId} does not exist in Feed`);
+        }
+
+        // Delete from Chat if exists
+        if (chatUserExists) {
+          await chatClient.deleteUser(userId, { mark_messages_deleted: true });
+          console.log(`Deleted user ${userId} from Chat`);
+          chatDeletions++;
+        } else {
+          console.log(`User ${userId} does not exist in Chat`);
+        }
+
+        // Delete from PostgreSQL regardless if exists
+        if (postgresUsers.includes(userId)) {
+          await db.query("DELETE FROM users WHERE id = $1", [userId]);
+          console.log(`Deleted user ${userId} from PostgreSQL`);
+        } else {
+          console.log(`User ${userId} does not exist in PostgreSQL`);
+        }
 
         // Pause if rate limit thresholds are reached
         if (feedDeletions >= 6 || chatDeletions >= 6) {
