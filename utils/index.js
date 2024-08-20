@@ -17,7 +17,6 @@ const app_id = isProduction
   : process.env.STREAM_APP_ID;
 
 const verifyUser = async (identifier, password, cb) => {
-  console.log("verifyUser", identifier);
   try {
     const sql = "SELECT * FROM users WHERE username = $1 OR email = $1";
     const result = await db.query(sql, [identifier]);

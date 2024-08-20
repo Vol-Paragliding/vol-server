@@ -107,8 +107,14 @@ const deleteUsers = async (userIds, cb) => {
 
 // restoreUser(userId);
 
-const usersToDelete = ["-43Z5RZsZcfpTc-usuA-q"];
-deleteUsers(usersToDelete, (err, result) => {
+const userIds = process.argv.slice(2);
+
+if (userIds.length === 0) {
+  console.error("Please provide at least one user ID.");
+  process.exit(1);
+}
+
+deleteUsers(userIds, (err, result) => {
   if (err) {
     console.error("Errors encountered while deleting users:", err);
   } else {

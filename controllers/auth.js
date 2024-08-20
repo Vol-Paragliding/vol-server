@@ -47,7 +47,7 @@ const signup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { identifier, password } = req.body;
-    console.log('login', identifier)
+
     verifyUser(identifier, password, (err, result) => {
       loginHandler(err, result, res);
     });
