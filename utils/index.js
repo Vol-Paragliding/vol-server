@@ -41,6 +41,7 @@ const verifyUser = async (identifier, password, cb) => {
       return cb("Incorrect Password.");
     }
   } catch (err) {
+    console.error("Error in verifyUser:", err);
     return cb(
       "An error occurred while processing your login. Please try again later."
     );
