@@ -16,28 +16,18 @@ const app_id = isProduction
   ? process.env.PROD_STREAM_APP_ID
   : process.env.STREAM_APP_ID;
 
-// Log environment variables
-console.log("Environment:", process.env.NODE_ENV);
-console.log("API Key:", api_key);
-console.log("API Secret:", api_secret);
-console.log("App ID:", app_id);
-
 const verifyUser = async (identifier, password, cb) => {
-  console.log(`Verifying user: ${identifier}`);
   try {
     const sql = "SELECT * FROM users WHERE username = $1 OR email = $1";
     const result = await db.query(sql, [identifier]);
 
     if (result.rows.length === 0) {
-      console.log("User not found in database");
       return cb("User with this username or email doesn't exist.");
     }
 
     const user = result.rows[0];
-    console.log(`User found: ${user.id}`);
 
     if (!user.salt || !user.hashed_password) {
-      console.log("User account created with Google OAuth");
       return cb(
         "This account was created using Google OAuth. Please log in using Google."
       );
@@ -45,10 +35,8 @@ const verifyUser = async (identifier, password, cb) => {
 
     const hashed_password = bcrypt.hashSync(password, user.salt);
     if (hashed_password === user.hashed_password) {
-      console.log("Password match successful");
       cb(null, user);
     } else {
-      console.log("Password match failed");
       return cb("Incorrect Password.");
     }
   } catch (err) {
@@ -69,7 +57,6 @@ const registerUser = async (
   profile,
   cb
 ) => {
-  console.log(`Registering new user: ${username}`);
   try {
     const salt = bcrypt.genSaltSync(10);
     const hashed_password = bcrypt.hashSync(password, salt);
@@ -88,7 +75,6 @@ const registerUser = async (
     ];
 
     await db.query(sql, params);
-    console.log(`User ${username} inserted into PostgreSQL`);
     cb(null, {
       id,
       userId,
@@ -106,7 +92,6 @@ const registerUser = async (
 };
 
 const searchUsers = async (searchTerm, selfUserId, cb) => {
-  console.log(`Searching for users with term: ${searchTerm}`);
   try {
     const lowercasedSearchTerm = searchTerm.toLowerCase();
     const sql =
@@ -114,7 +99,6 @@ const searchUsers = async (searchTerm, selfUserId, cb) => {
     const params = [`%${lowercasedSearchTerm}%`, selfUserId];
 
     const result = await db.query(sql, params);
-    console.log(`Search results: ${result.rows.length} users found`);
     cb(null, result.rows);
   } catch (err) {
     console.error("Error in searchUsers:", err);
@@ -131,8 +115,6 @@ const signupHandler = async (error, result, res) => {
 
   const { username, userId, id, name, email = "", profile } = result;
 
-  console.log(`Handling signup for userId: ${userId}, username: ${username}`);
-
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -148,8 +130,6 @@ const signupHandler = async (error, result, res) => {
       profile,
     });
 
-    console.log(`User ${id} created in Chat`);
-
     const user = await feedClient.user(id).create({
       id,
       userId,
@@ -158,8 +138,6 @@ const signupHandler = async (error, result, res) => {
       email,
       profile,
     });
-
-    console.log(`User ${id} created in Feed`);
 
     const userFeed = feedClient.feed("user", id);
     await userFeed.addActivity({
@@ -171,9 +149,6 @@ const signupHandler = async (error, result, res) => {
 
     const feedToken = feedClient.createUserToken(id);
     const chatToken = chatClient.createToken(id);
-
-    console.log(`Generated feedToken: ${feedToken}`);
-    console.log(`Generated chatToken: ${chatToken}`);
 
     res.status(200).json({
       feedToken,
@@ -206,8 +181,6 @@ const loginHandler = async (error, result, res) => {
 
   const { username, email, id, userId, name, profile } = result;
 
-  console.log(`Handling login for userId: ${userId}, username: ${username}`);
-
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -218,15 +191,11 @@ const loginHandler = async (error, result, res) => {
       id: { $eq: id },
     });
     if (!users.length) {
-      console.log("User not found in Chat");
       return res.status(400).json({ message: "User not found" });
     }
 
     const chatToken = chatClient.createToken(id);
     const feedToken = feedClient.createUserToken(id);
-
-    console.log(`Generated feedToken: ${feedToken}`);
-    console.log(`Generated chatToken: ${chatToken}`);
 
     res.status(200).json({
       feedToken,
