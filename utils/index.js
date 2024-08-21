@@ -86,7 +86,6 @@ const registerUser = async (
       profile,
     });
   } catch (err) {
-    console.error("Error in registerUser:", err);
     cb(err, null);
   }
 };
@@ -101,20 +100,16 @@ const searchUsers = async (searchTerm, selfUserId, cb) => {
     const result = await db.query(sql, params);
     cb(null, result.rows);
   } catch (err) {
-    console.error("Error in searchUsers:", err);
     cb(err, []);
   }
 };
 
 const signupHandler = async (error, result, res) => {
   if (error) {
-    console.error("Error in signupHandler:", error);
     res.status(500).json({ message: error });
     return;
   }
-
   const { username, userId, id, name, email = "", profile } = result;
-
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -147,6 +142,10 @@ const signupHandler = async (error, result, res) => {
       text: `${username} has signed up! 🎉🎉🎉`,
     });
 
+    const timelineFeed = feedClient.feed("timeline", id);
+    await timelineFeed.follow("user", id);
+    const notificationFeed = feedClient.feed("notification", id);
+
     const feedToken = feedClient.createUserToken(id);
     const chatToken = chatClient.createToken(id);
 
@@ -163,7 +162,7 @@ const signupHandler = async (error, result, res) => {
       },
     });
   } catch (error) {
-    console.error("Error in signupHandler:", error.message);
+    console.error(error.message);
     if (error.code === 16) {
       res.status(409).json({ message: "Username unavailable" });
     } else {
@@ -178,9 +177,7 @@ const loginHandler = async (error, result, res) => {
     res.status(400).json({ message: error });
     return;
   }
-
   const { username, email, id, userId, name, profile } = result;
-
   const feedClient = connect(api_key, api_secret, app_id, {
     location: "us-east",
   });
@@ -191,6 +188,7 @@ const loginHandler = async (error, result, res) => {
       id: { $eq: id },
     });
     if (!users.length) {
+      console.log("User not found");
       return res.status(400).json({ message: "User not found" });
     }
 
@@ -213,9 +211,7 @@ const loginHandler = async (error, result, res) => {
     console.error("Error in loginHandler:", error);
     res
       .status(500)
-      .json({
-        message: "An unexpected error occurred. Please try again later",
-      });
+      .json({ message: "An unexpected error occurred. Please try agin later" });
   }
 };
 
