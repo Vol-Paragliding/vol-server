@@ -135,12 +135,12 @@ const signupHandler = async (error, result, res) => {
     });
 
     const userFeed = feedClient.feed("user", id);
-    await userFeed.addActivity({
-      actor: user,
-      verb: "signup",
-      object: `${username} has signed up! 🎉🎉🎉`,
-      text: `${username} has signed up! 🎉🎉🎉`,
-    });
+    // await userFeed.addActivity({
+    //   actor: user,
+    //   verb: "signup",
+    //   object: `${username} has signed up! 🎉🎉🎉`,
+    //   text: `${username} has signed up! 🎉🎉🎉`,
+    // });
 
     const timelineFeed = feedClient.feed("timeline", id);
     await timelineFeed.follow("user", id);
