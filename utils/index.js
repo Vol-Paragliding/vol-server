@@ -33,7 +33,6 @@ const verifyUser = async (identifier, password, cb) => {
       );
     }
 
-    // Convert the salt and stored hashed password to strings if they're Buffers
     const salt =
       user.salt instanceof Buffer ? user.salt.toString("utf-8") : user.salt;
     const storedHashedPassword =
@@ -41,12 +40,7 @@ const verifyUser = async (identifier, password, cb) => {
         ? user.hashed_password.toString("utf-8")
         : user.hashed_password;
 
-    console.log("Password before hashing:", password);
-    console.log("Salt from DB (converted to string):", salt);
-
     const generatedHashedPassword = bcrypt.hashSync(password, salt);
-    console.log("Generated Hashed Password:", generatedHashedPassword);
-    console.log("Stored Hashed Password:", storedHashedPassword);
 
     if (generatedHashedPassword === storedHashedPassword) {
       cb(null, user);
