@@ -33,7 +33,7 @@ const verifyUser = async (identifier, password, cb) => {
       );
     }
 
-    const salt = user.salt.toString("utf8");
+    const salt = user.salt.toString("base64");
 
     console.log("Password before hashing:", password);
     console.log("Salt from DB:", salt);
