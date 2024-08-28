@@ -1,3 +1,4 @@
+const axios = require("axios");
 const { generateUniqueUsername } = require("../utils/usernameGenerator");
 const db = require("../db");
 const {
@@ -19,8 +20,36 @@ const generateUniqueId = async () => {
 
 const signup = async (req, res) => {
   try {
-    const { identifier, password, email, userId, id, username, name, profile } =
-      req.body;
+    const {
+      identifier,
+      password,
+      email,
+      userId,
+      id,
+      username,
+      name,
+      profile,
+      recaptchaToken,
+    } = req.body;
+
+    const recaptchaResponse = await axios.post(
+      `https://www.google.com/recaptcha/api/siteverify`,
+      {},
+      {
+        params: {
+          secret: process.env.RECAPTCHA_SECRET_KEY,
+          response: recaptchaToken,
+        },
+      }
+    );
+
+    const recaptchaData = recaptchaResponse.data;
+
+    if (!recaptchaData.success || recaptchaData.score < 0.5) {
+      return res
+        .status(400)
+        .json({ message: "reCAPTCHA verification failed." });
+    }
 
     const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier);
     const emailToUse = isEmail ? identifier : email;
@@ -35,24 +64,49 @@ const signup = async (req, res) => {
       name,
       profile,
       function (err, result) {
+        if (err) {
+          console.log("Error during user registration", err);
+        }
         signupHandler(err, result, res);
       }
     );
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: err });
+    console.log("Signup error", err);
+    res.status(500).json({ message: err.message });
   }
 };
 
 const login = async (req, res) => {
   try {
-    const { identifier, password } = req.body;
+    const { identifier, password, recaptchaToken } = req.body;
+
+    const recaptchaResponse = await axios.post(
+      `https://www.google.com/recaptcha/api/siteverify`,
+      {},
+      {
+        params: {
+          secret: process.env.RECAPTCHA_SECRET_KEY,
+          response: recaptchaToken,
+        },
+      }
+    );
+
+    const recaptchaData = recaptchaResponse.data;
+
+    if (!recaptchaData.success || recaptchaData.score < 0.5) {
+      return res
+        .status(400)
+        .json({ message: "reCAPTCHA verification failed." });
+    }
 
     verifyUser(identifier, password, (err, result) => {
+      if (err) {
+        console.log("Error during user verification", err);
+      }
       loginHandler(err, result, res);
     });
   } catch (error) {
-    console.log(error);
+    console.error("Login error", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -122,7 +176,6 @@ const findOrCreateUser = async (
         "INSERT INTO users (id, userId, username, name, email, googleId, profile) VALUES ($1, $2, $3, $4, $5, $6, $7)";
       const params = [id, userId, username, name, email, googleId, userProfile];
       await db.query(sql, params);
-
 
       const newUser = {
         id,
