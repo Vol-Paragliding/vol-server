@@ -88,25 +88,25 @@ const login = async (req, res) => {
     console.log("Password length:", password.length);
     console.log("Recaptcha token:", recaptchaToken);
 
-    const recaptchaResponse = await axios.post(
-      `https://www.google.com/recaptcha/api/siteverify`,
-      {},
-      {
-        params: {
-          secret: process.env.RECAPTCHA_SECRET_KEY,
-          response: recaptchaToken,
-        },
-      }
-    );
+    // const recaptchaResponse = await axios.post(
+    //   `https://www.google.com/recaptcha/api/siteverify`,
+    //   {},
+    //   {
+    //     params: {
+    //       secret: process.env.RECAPTCHA_SECRET_KEY,
+    //       response: recaptchaToken,
+    //     },
+    //   }
+    // );
 
-    const recaptchaData = recaptchaResponse.data;
+    // const recaptchaData = recaptchaResponse.data;
 
-    if (!recaptchaData.success || recaptchaData.score < 0.5) {
-      console.log("Recaptcha verification failed");
-      return res
-        .status(400)
-        .json({ message: "reCAPTCHA verification failed." });
-    }
+    // if (!recaptchaData.success || recaptchaData.score < 0.5) {
+    //   console.log("Recaptcha verification failed");
+    //   return res
+    //     .status(400)
+    //     .json({ message: "reCAPTCHA verification failed." });
+    // }
 
     console.log("Recaptcha verification passed");
 

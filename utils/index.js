@@ -33,6 +33,9 @@ const verifyUser = async (identifier, password, cb) => {
       );
     }
 
+    console.log("Password before hashing:", password);
+    console.log("Salt from DB:", user.salt);
+
     const hashed_password = bcrypt.hashSync(password, user.salt);
     if (hashed_password === user.hashed_password) {
       cb(null, user);
