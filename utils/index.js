@@ -33,14 +33,13 @@ const verifyUser = async (identifier, password, cb) => {
       );
     }
 
-    const salt = user.salt;
+    const salt =
+      user.salt instanceof Buffer ? user.salt.toString("utf-8") : user.salt;
+
     console.log("Password before hashing:", password);
-    console.log("Salt from DB:", salt);
+    console.log("Salt from DB (converted to string):", salt);
 
     const hashed_password = bcrypt.hashSync(password, salt);
-    console.log("Generated Hashed Password:", hashed_password);
-    console.log("Stored Hashed Password:", user.hashed_password);
-
     if (hashed_password === user.hashed_password) {
       cb(null, user);
     } else {
