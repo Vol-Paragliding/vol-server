@@ -44,7 +44,10 @@ const signup = async (req, res) => {
     );
 
     const recaptchaData = recaptchaResponse.data;
-
+console.log('recaptchaData', recaptchaData)
+console.log('recaptchaToken', recaptchaToken)
+console.log('identifier', identifier)
+console.log('password', password)
     if (!recaptchaData.success || recaptchaData.score < 0.5) {
       return res
         .status(400)
@@ -80,6 +83,11 @@ const login = async (req, res) => {
   try {
     const { identifier, password, recaptchaToken } = req.body;
 
+    // Log the received data for debugging
+    console.log("Login attempt with identifier:", identifier);
+    console.log("Password length:", password.length);
+    console.log("Recaptcha token:", recaptchaToken);
+
     const recaptchaResponse = await axios.post(
       `https://www.google.com/recaptcha/api/siteverify`,
       {},
@@ -94,10 +102,13 @@ const login = async (req, res) => {
     const recaptchaData = recaptchaResponse.data;
 
     if (!recaptchaData.success || recaptchaData.score < 0.5) {
+      console.log("Recaptcha verification failed");
       return res
         .status(400)
         .json({ message: "reCAPTCHA verification failed." });
     }
+
+    console.log("Recaptcha verification passed");
 
     verifyUser(identifier, password, (err, result) => {
       if (err) {
