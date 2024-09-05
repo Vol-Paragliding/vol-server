@@ -70,6 +70,26 @@ router.post("/check-availability", async (req, res) => {
   }
 });
 
+router.post("/get-username-by-id", async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const result = await db.query("SELECT username FROM users WHERE id = $1", [
+      userId,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const username = result.rows[0].username;
+    res.status(200).json({ username });
+  } catch (error) {
+    console.error("Error fetching username:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 router.post("/get-user-id", async (req, res) => {
   const { username } = req.body;
 

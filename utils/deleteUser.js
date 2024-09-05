@@ -107,7 +107,8 @@ const deleteUsers = async (userIds, cb) => {
 
 // restoreUser(userId);
 
-const userIds = process.argv.slice(2);
+// const userIds = process.argv.slice(2);
+const userIds = ["balL2MkgQF77UueQNQpgH"];
 
 if (userIds.length === 0) {
   console.error("Please provide at least one user ID.");
