@@ -2,6 +2,7 @@ const { connect } = require("getstream");
 const StreamChat = require("stream-chat").StreamChat;
 const bcrypt = require("bcrypt");
 const db = require("../db");
+const { uploadUserImageToGCS } = require("./imageUpload");
 require("dotenv").config();
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -254,7 +255,7 @@ const updateProfile = async (userId, updates) => {
 
     const updatedFeedProfile = {
       ...currentUserData.data.profile,
-      ...updates.profile,
+      ...updatedProfile,
     };
 
     await feedClient.user(userId).update({
@@ -296,8 +297,10 @@ const updateProfile = async (userId, updates) => {
   }
 };
 
-const updateUserProfileImage = async (userId, imageUrl) => {
+const updateUserProfileImage = async (userId, imageFile) => {
   try {
+    const imageUrl = await uploadUserImageToGCS(imageFile, userId);
+
     // Fetch the current profile JSON string from the PostgreSQL database
     const userResult = await db.query(
       "SELECT profile FROM users WHERE id = $1",
@@ -336,30 +339,7 @@ const updateUserProfileImage = async (userId, imageUrl) => {
       profile: updatedProfile,
     });
 
-    // Update the chat database
-    const chatClient = StreamChat.getInstance(api_key, api_secret);
-
-    const { users } = await chatClient.queryUsers({
-      id: { $eq: userId },
-    });
-
-    if (!users.length) {
-      throw new Error("User not found in chat database");
-    }
-
-    const chatUser = users[0];
-
-    const updatedChatUserProfile = {
-      ...chatUser.profile,
-      image: imageUrl,
-    };
-
-    await chatClient.upsertUser({
-      ...chatUser,
-      profile: updatedChatUserProfile,
-    });
-
-    return { message: "Profile image updated successfully" };
+    return { message: "Profile image updated successfully", imageUrl };
   } catch (error) {
     console.error("Error updating profile image:", error);
     throw error;
@@ -451,6 +431,27 @@ const deleteUser = async (req, res) => {
     }
   }
 };
+// TODO: test this function
+const getUsers = async (offset = 0, limit = 10, searchTerm = "") => {
+  try {
+    let sql = "SELECT id, username, name, email, image_url FROM users";
+    const params = [];
+
+    if (searchTerm) {
+      sql += " WHERE LOWER(username) LIKE $1 OR LOWER(name) LIKE $1";
+      params.push(`%${searchTerm.toLowerCase()}%`);
+    }
+
+    sql += " ORDER BY name LIMIT $2 OFFSET $3";
+    params.push(limit, offset);
+
+    const result = await db.query(sql, params);
+    return result.rows;
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    throw error;
+  }
+};
 
 module.exports = {
   verifyUser,
@@ -462,4 +463,5 @@ module.exports = {
   updateUserProfileImage,
   searchUsers,
   deleteUser,
+  getUsers,
 };

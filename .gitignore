@@ -29,3 +29,12 @@ node_modules/
 /var/db/*.db
 
 pg_data/
+credentials/
+
+# Yarn PnP files
+.pnp.cjs
+.pnp.loader.mjs
+.pnp.loader.js
+.pnp.data.json
+.pnp/
+install-state.gz

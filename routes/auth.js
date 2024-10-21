@@ -1,5 +1,8 @@
 const express = require("express");
 const { OAuth2Client } = require("google-auth-library");
+const multer = require("multer");
+const { getUsers } = require("../utils");
+const { uploadUserImageToGCS } = require("../utils/imageUpload");
 const db = require("../db");
 const {
   signup,
@@ -11,6 +14,7 @@ const {
   updateUserProfileImage,
 } = require("../controllers/auth");
 
+const upload = multer();
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -125,20 +129,38 @@ router.post("/update-profile", async (req, res) => {
   }
 });
 
-router.post("/update-profile-image", async (req, res) => {
-  const { userId, imageUrl } = req.body;
+router.post(
+  "/update-profile-image",
+  upload.single("image"),
+  async (req, res) => {
+    const { userId } = req.body;
+    const imageFile = req.file;
 
-  if (!userId || !imageUrl) {
-    return res
-      .status(400)
-      .json({ message: "User ID and image URL are required" });
+    if (!userId || !imageFile) {
+      return res
+        .status(400)
+        .json({ message: "User ID and image file are required" });
+    }
+
+    try {
+      const imageUrl = await uploadUserImageToGCS(imageFile, userId);
+
+      res.status(200).json({ imageUrl });
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      res.status(500).json({ message: "Error uploading image" });
+    }
   }
+);
+// TODO: test this route
+router.get("/users", async (req, res) => {
+  const { offset = 0, limit = 10, searchTerm = "" } = req.query;
 
   try {
-    const result = await updateUserProfileImage(userId, imageUrl);
-    res.status(200).json(result);
+    const users = await getUsers(Number(offset), Number(limit), searchTerm);
+    res.status(200).json({ users });
   } catch (error) {
-    res.status(500).json({ message: "Error updating profile image" });
+    res.status(500).json({ message: "Error fetching users" });
   }
 });
 
