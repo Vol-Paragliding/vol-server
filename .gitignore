@@ -38,3 +38,4 @@ credentials/
 .pnp.data.json
 .pnp/
 install-state.gz
+.yarn/cache

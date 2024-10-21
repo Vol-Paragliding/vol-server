@@ -35,5 +35,8 @@
     "stream-chat": "^8.2.1",
     "unique-names-generator": "^4.7.1"
   },
-  "packageManager": "yarn@4.5.1"
+  "packageManager": "yarn@4.5.1",
+  "engines": {
+    "yarn": ">=2.0.0"
+  }
 }
