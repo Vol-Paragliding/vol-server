@@ -3174,7 +3174,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"semver@npm:^7.3.5, semver@npm:^7.5.4":
+"semver@npm:^7.3.5, semver@npm:^7.5.4, semver@npm:^7.6.3":
   version: 7.6.3
   resolution: "semver@npm:7.6.3"
   bin:
@@ -3256,6 +3256,7 @@ __metadata:
     passport: "npm:^0.7.0"
     passport-google-oauth20: "npm:^2.0.0"
     pg: "npm:^8.12.0"
+    semver: "npm:^7.6.3"
     sqlite3: "npm:^5.1.4"
     stream-chat: "npm:^8.2.1"
     unique-names-generator: "npm:^4.7.1"
