@@ -23,6 +23,7 @@
     "express-session": "^1.18.0",
     "getstream": "^8.1.0",
     "google-auth-library": "^9.11.0",
+    "graceful-fs": "^4.2.11",
     "knex": "^3.1.0",
     "mkdirp": "^1.0.4",
     "multer": "^1.4.5-lts.1",
@@ -37,6 +38,6 @@
   },
   "packageManager": "yarn@4.5.1",
   "engines": {
-    "yarn": ">=2.0.0"
+    "node": ">=20.x"
   }
 }
