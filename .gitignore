@@ -30,6 +30,7 @@ node_modules/
 
 pg_data/
 credentials/
+encoded_credentials.txt
 
 # Yarn PnP files
 .pnp.cjs

@@ -1,0 +1,3 @@
+{
+  "ignore": ["credentials/google-credentials.json"]
+}

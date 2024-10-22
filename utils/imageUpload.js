@@ -1,13 +1,19 @@
 const { Storage } = require("@google-cloud/storage");
 const path = require("path");
+const fs = require("fs");
 require("dotenv").config();
+
+const base64Credentials = process.env.GOOGLE_CREDENTIALS_BASE64;
+const credentialsPath = path.join(
+  __dirname,
+  "../credentials/google-credentials.json"
+);
+
+fs.writeFileSync(credentialsPath, Buffer.from(base64Credentials, "base64"));
 
 const storage = new Storage({
   projectId: process.env.GCP_PROJECT_ID,
-  keyFilename: path.join(
-    __dirname,
-    "../credentials/vol-social-5864eb20e5e0.json"
-  ),
+  keyFilename: credentialsPath,
 });
 
 const bucketName = "vol-images";
