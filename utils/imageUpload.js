@@ -4,10 +4,7 @@ const fs = require("fs");
 require("dotenv").config();
 
 const base64Credentials = process.env.GOOGLE_CREDENTIALS_BASE64;
-const credentialsPath = path.join(
-  __dirname,
-  "../credentials/google-credentials.json"
-);
+const credentialsPath = path.join("/tmp", "google-credentials.json");
 
 fs.writeFileSync(credentialsPath, Buffer.from(base64Credentials, "base64"));
 
