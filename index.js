@@ -10,13 +10,13 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 app.use(cors());
-// app.use(
-//   cors({
-//     origin: ["https://volflights.com", "http://localhost:3000"],
-//     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-//     credentials: true,
-//   })
-// );
+app.use(
+  cors({
+    origin: ["https://volflights.com", "http://localhost:3000"],
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
