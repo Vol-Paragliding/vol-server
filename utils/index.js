@@ -2,7 +2,7 @@ const { connect } = require("getstream");
 const StreamChat = require("stream-chat").StreamChat;
 const bcrypt = require("bcrypt");
 const db = require("../db");
-const { uploadUserImageToGCS } = require("./imageUpload");
+const { uploadUserImageToGCP } = require("./imageUpload");
 require("dotenv").config();
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -299,7 +299,7 @@ const updateProfile = async (userId, updates) => {
 
 const updateUserProfileImage = async (userId, imageFile) => {
   try {
-    const imageUrl = await uploadUserImageToGCS(imageFile, userId);
+    const imageUrl = await uploadUserImageToGCP(imageFile, userId);
 
     // Fetch the current profile JSON string from the PostgreSQL database
     const userResult = await db.query(

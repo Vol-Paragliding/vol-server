@@ -2,7 +2,7 @@ const express = require("express");
 const { OAuth2Client } = require("google-auth-library");
 const multer = require("multer");
 const { getUsers } = require("../utils");
-const { uploadUserImageToGCS } = require("../utils/imageUpload");
+const { uploadUserImageToGCP } = require("../utils/imageUpload");
 const db = require("../db");
 const {
   signup,
@@ -11,7 +11,6 @@ const {
   deleteUser,
   findOrCreateUser,
   updateProfile,
-  updateUserProfileImage,
 } = require("../controllers/auth");
 
 const upload = multer();
@@ -143,7 +142,7 @@ router.post(
     }
 
     try {
-      const imageUrl = await uploadUserImageToGCS(imageFile, userId);
+      const imageUrl = await uploadUserImageToGCP(imageFile, userId);
 
       res.status(200).json({ imageUrl });
     } catch (error) {

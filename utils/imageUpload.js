@@ -15,7 +15,7 @@ const storage = new Storage({
 
 const bucketName = "vol-images";
 
-const uploadUserImageToGCS = async (file, userId) => {
+const uploadUserImageToGCP = async (file, userId) => {
   const bucket = storage.bucket(bucketName);
   const fileName = `${userId}/${Date.now()}-${file.originalname}`;
   const gcsFile = bucket.file(fileName);
@@ -35,4 +35,4 @@ const uploadUserImageToGCS = async (file, userId) => {
   }
 };
 
-module.exports = { uploadUserImageToGCS };
+module.exports = { uploadUserImageToGCP };

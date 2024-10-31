@@ -12,6 +12,7 @@ const {
   searchUsersHandler,
   deleteUser,
 } = require("../utils");
+const { uploadUserImageToGCP } = require("../utils/imageUpload");
 
 const generateUniqueId = async () => {
   const { nanoid } = await import("nanoid");
@@ -137,33 +138,43 @@ const findOrCreateUser = async (
 
     if (user) {
       const { id, userId, username, name, profile } = user;
-      try {
-        const updatedProfile = profile || {};
-        await loginHandler(
-          null,
-          { username, id, userId, name, profile: updatedProfile },
-          res
-        );
-      } catch (error) {
-        console.error("Error logging in user:", error);
-        return res.status(500).json({ message: "Error logging in user" });
-      }
+      const updatedProfile = profile || {};
+      await loginHandler(
+        null,
+        { username, id, userId, name, profile: updatedProfile },
+        res
+      );
     } else {
       const id = await generateUniqueId();
       const userId = id;
       const username = await generateUniqueUsername();
+
+      let gcpProfileImage = "";
+      try {
+        const response = await axios({
+          url: profileImage,
+          method: "GET",
+          responseType: "arraybuffer",
+        });
+
+        const file = {
+          originalname: "profile.jpg",
+          buffer: Buffer.from(response.data, "binary"),
+          mimetype: response.headers["content-type"] || "image/jpeg",
+        };
+
+        gcpProfileImage = await uploadUserImageToGCP(file, userId);
+      } catch (uploadError) {
+        console.error("Error uploading Google image to GCP:", uploadError);
+      }
+
       const userProfile = {
         bio: "",
         location: "",
-        image: profileImage || "",
+        image: gcpProfileImage,
         coverPhoto: "",
         yearStartedFlying: "",
-        certifications: {
-          p: "",
-          h: "",
-          s: "",
-          t: "",
-        },
+        certifications: { p: "", h: "", s: "", t: "" },
         favoriteSites: [],
         wings: [],
         harnesses: [],
@@ -188,21 +199,16 @@ const findOrCreateUser = async (
         profile: userProfile,
       };
 
-      try {
-        await signupHandler(null, newUser, res);
-        console.log(
-          `User successfully inserted into database: ${JSON.stringify(newUser)}`
-        );
-      } catch (error) {
-        console.error("Error creating user in feed or chat:", error);
-        return res
-          .status(500)
-          .json({ message: "Error creating user in feed or chat" });
-      }
+      await signupHandler(null, newUser, res);
+      console.log(
+        `User successfully inserted into database with GCP image: ${JSON.stringify(
+          newUser
+        )}`
+      );
     }
   } catch (err) {
     console.error("Error processing user:", err);
-    return res.status(500).json({ message: "Error processing user" });
+    res.status(500).json({ message: "Error processing user" });
   }
 };
 
