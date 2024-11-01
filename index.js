@@ -9,26 +9,6 @@ const authRoutes = require("./routes/auth.js");
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use((req, res, next) => {
-  console.log("req.hostname:", req.hostname);
-  console.log("req.headers.host:", req.headers.host);
-
-  const hostname = req.hostname;
-  const host = req.headers.host;
-
-  if (
-    hostname === "volflights.com" ||
-    hostname === "www.volflights.com" ||
-    host === "volflights.com" ||
-    host === "www.volflights.com"
-  ) {
-    console.log("Redirecting to https://vol.flights...");
-    return res.redirect(301, `https://vol.flights${req.originalUrl}`);
-  }
-
-  next();
-});
-
 app.use(cors());
 // app.use(
 //   cors({
