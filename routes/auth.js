@@ -1,8 +1,15 @@
 const express = require("express");
 const { OAuth2Client } = require("google-auth-library");
 const multer = require("multer");
+const crypto = require("crypto");
+const bcrypt = require("bcrypt");
+
 const { getUsers } = require("../utils");
 const { uploadUserImageToGCP } = require("../utils/imageUpload");
+const {
+  saveResetTokenToDatabase,
+  sendRecoveryEmail,
+} = require("../utils/accountRecovery");
 const db = require("../db");
 const {
   signup,
@@ -12,6 +19,7 @@ const {
   findOrCreateUser,
   updateProfile,
 } = require("../controllers/auth");
+const { FRONTEND_URL } = require("../config");
 
 const upload = multer();
 const router = express.Router();
@@ -151,6 +159,79 @@ router.post(
     }
   }
 );
+
+router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const userResult = await db.query("SELECT * FROM users WHERE email = $1", [
+      email,
+    ]);
+
+    if (userResult.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "User with this email does not exist" });
+    }
+
+    const user = userResult.rows[0];
+
+    if (!user.hashed_password || !user.salt) {
+      return res.status(400).json({
+        message:
+          "This account was created using Google OAuth. Please log in using Google.",
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const tokenExpiration = new Date();
+    tokenExpiration.setHours(tokenExpiration.getHours() + 1);
+
+    await saveResetTokenToDatabase(email, resetToken);
+
+    const resetLink = `${FRONTEND_URL}/reset-password?token=${resetToken}`;
+
+    await sendRecoveryEmail(email, resetLink);
+
+    res.status(200).json({ message: "Password reset email sent" });
+  } catch (error) {
+    console.error("Error sending recovery email:", error);
+    res.status(500).json({ message: "Error sending recovery email" });
+  }
+});
+
+router.post("/reset-password", async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  try {
+    console.log("Received token:", token);
+    const userResult = await db.query(
+      "SELECT * FROM users WHERE resetToken = $1 AND tokenExpiration > NOW()",
+      [token]
+    );
+    console.log("User result from DB:", userResult.rows);
+
+    if (userResult.rows.length === 0) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    const user = userResult.rows[0];
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await db.query(
+      "UPDATE users SET hashed_password = $1, salt = $2, resetToken = NULL, tokenExpiration = NULL WHERE id = $3",
+      [hashedPassword, salt, user.id]
+    );
+
+    res.status(200).json({ message: "Password reset successfully" });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ message: "Error resetting password" });
+  }
+});
+
 // TODO: test this route
 router.get("/users", async (req, res) => {
   const { offset = 0, limit = 10, searchTerm = "" } = req.query;

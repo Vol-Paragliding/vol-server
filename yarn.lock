@@ -84,6 +84,29 @@
     mkdirp "^1.0.4"
     rimraf "^3.0.2"
 
+"@sendgrid/client@^8.1.4":
+  version "8.1.4"
+  resolved "https://registry.npmjs.org/@sendgrid/client/-/client-8.1.4.tgz#4db39e49d8ed732169d73b5d5c94d2b11907970d"
+  integrity sha512-VxZoQ82MpxmjSXLR3ZAE2OWxvQIW2k2G24UeRPr/SYX8HqWLV/8UBN15T2WmjjnEb5XSmFImTJOKDzzSeKr9YQ==
+  dependencies:
+    "@sendgrid/helpers" "^8.0.0"
+    axios "^1.7.4"
+
+"@sendgrid/helpers@^8.0.0":
+  version "8.0.0"
+  resolved "https://registry.npmjs.org/@sendgrid/helpers/-/helpers-8.0.0.tgz#f74bf9743bacafe4c8573be46166130c604c0fc1"
+  integrity sha512-Ze7WuW2Xzy5GT5WRx+yEv89fsg/pgy3T1E3FS0QEx0/VvRmigMZ5qyVGhJz4SxomegDkzXv/i0aFPpHKN8qdAA==
+  dependencies:
+    deepmerge "^4.2.2"
+
+"@sendgrid/mail@^8.1.4":
+  version "8.1.4"
+  resolved "https://registry.npmjs.org/@sendgrid/mail/-/mail-8.1.4.tgz#0ba72906685eae1a1ef990cca31e962f1ece6928"
+  integrity sha512-MUpIZykD9ARie8LElYCqbcBhGGMaA/E6I7fEcG7Hc2An26QJyLtwOaKQ3taGp8xO8BICPJrSKuYV4bDeAJKFGQ==
+  dependencies:
+    "@sendgrid/client" "^8.1.4"
+    "@sendgrid/helpers" "^8.0.0"
+
 "@tootallnate/once@1":
   version "1.1.2"
   resolved "https://registry.npmjs.org/@tootallnate/once/-/once-1.1.2.tgz#ccb91445360179a04e7fe6aff78c00ffc1eeaf82"
@@ -264,7 +287,7 @@ axios@0.x:
     form-data "^4.0.0"
     proxy-from-env "^1.1.0"
 
-axios@^1.6.0, axios@^1.7.2:
+axios@^1.6.0, axios@^1.7.2, axios@^1.7.4:
   version "1.7.7"
   resolved "https://registry.npmjs.org/axios/-/axios-1.7.7.tgz#2f554296f9892a72ac8d8e4c5b79c14a91d0a47f"
   integrity sha512-S4kL7XrjgBmvdGut0sN3yJxqYzrDOnivkBiN0OFs6hLiUam3UPvswUo0kqGyhqUZGEOytHyumEdXsAkgCOUf3Q==
@@ -595,6 +618,11 @@ deep-extend@^0.6.0:
   version "0.6.0"
   resolved "https://registry.npmjs.org/deep-extend/-/deep-extend-0.6.0.tgz#c4fa7c95404a17a9c3e8ca7e1537312b736330ac"
   integrity sha512-LOHxIOaPYdHlJRtCQfDIVZtfw/ufM8+rVj649RIHzcm/vGwQRXFt6OPqIFWsm2XEMrNIEtWR64sY1LEKD2vAOA==
+
+deepmerge@^4.2.2:
+  version "4.3.1"
+  resolved "https://registry.npmjs.org/deepmerge/-/deepmerge-4.3.1.tgz#44b5f2147cd3b00d4b56137685966f26fd25dd4a"
+  integrity sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==
 
 define-data-property@^1.1.4:
   version "1.1.4"

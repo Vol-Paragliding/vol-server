@@ -3,6 +3,7 @@ const StreamChat = require("stream-chat").StreamChat;
 const bcrypt = require("bcrypt");
 const db = require("../db");
 const { uploadUserImageToGCP } = require("./imageUpload");
+const deleteUserActivities = require("./deleteUserActivities");
 require("dotenv").config();
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -369,6 +370,7 @@ const deleteUser = async (req, res) => {
   let dbSuccess = false;
 
   try {
+    await deleteUserActivities(userId);
     // Delete user from the feed database
     await feedClient.user(userId).delete();
     feedSuccess = true;
