@@ -42,6 +42,45 @@ const deleteUserActivities = async (userId) => {
         }
       }
     }
+
+    const userFeed = feedClient.feed("user", userId);
+    const followers = await userFeed.followers();
+
+    for (const follower of followers.results) {
+      const [feedGroup, followerUserId] = follower.feed_id.split(":");
+      const followerFeed = feedClient.feed(feedGroup, followerUserId);
+
+      console.log(`Processing follower feed: ${follower.feed_id}`);
+
+      let hasMoreActivities = true;
+      let followerOffset = 0;
+
+      while (hasMoreActivities) {
+        const followerResponse = await followerFeed.get({
+          limit,
+          offset: followerOffset,
+        });
+        const followerActivities = followerResponse.results;
+
+        if (followerActivities.length === 0) {
+          hasMoreActivities = false;
+        } else {
+          for (const activity of followerActivities) {
+            if (
+              activity.actor === `SU:${userId}`
+            ) {
+              console.log(
+                `Deleting activity ${activity.id} from follower feed`
+              );
+              await followerFeed.removeActivity(activity.id);
+            }
+          }
+          followerOffset += limit;
+        }
+      }
+    }
+
+    console.log("Successfully deleted user activities from all feeds");
   } catch (error) {
     console.error("Error during deletion", error);
     throw error;
