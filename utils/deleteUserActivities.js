@@ -16,71 +16,25 @@ const app_id = isProduction
 const deleteUserActivities = async (userId) => {
   try {
     const feedClient = connect(api_key, api_secret, app_id);
-    const allUsersFeed = feedClient.feed("allusers", "allusers");
+    const userFeed = feedClient.feed("user", userId);
+
     let hasMore = true;
     let offset = 0;
     const limit = 100;
 
     while (hasMore) {
-      const response = await allUsersFeed.get({ limit, offset });
+      const response = await userFeed.get({ limit, offset });
       const activities = response.results;
 
       if (activities.length === 0) {
         hasMore = false;
       } else {
-        let activitiesDeleted = 0;
-
         for (const activity of activities) {
-          if (activity.actor === `SU:${userId}`) {
-            await allUsersFeed.removeActivity(activity.id);
-            activitiesDeleted++;
-          }
+          await userFeed.removeActivity(activity.id);
         }
-
-        if (activitiesDeleted === 0) {
-          offset += limit;
-        }
+        offset += limit;
       }
     }
-
-    const userFeed = feedClient.feed("user", userId);
-    const followers = await userFeed.followers();
-
-    for (const follower of followers.results) {
-      const [feedGroup, followerUserId] = follower.feed_id.split(":");
-      const followerFeed = feedClient.feed(feedGroup, followerUserId);
-
-      console.log(`Processing follower feed: ${follower.feed_id}`);
-
-      let hasMoreActivities = true;
-      let followerOffset = 0;
-
-      while (hasMoreActivities) {
-        const followerResponse = await followerFeed.get({
-          limit,
-          offset: followerOffset,
-        });
-        const followerActivities = followerResponse.results;
-
-        if (followerActivities.length === 0) {
-          hasMoreActivities = false;
-        } else {
-          for (const activity of followerActivities) {
-            if (
-              activity.actor === `SU:${userId}`
-            ) {
-              console.log(
-                `Deleting activity ${activity.id} from follower feed`
-              );
-              await followerFeed.removeActivity(activity.id);
-            }
-          }
-          followerOffset += limit;
-        }
-      }
-    }
-
-    console.log("Successfully deleted user activities from all feeds");
   } catch (error) {
     console.error("Error during deletion", error);
     throw error;

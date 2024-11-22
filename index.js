@@ -1,9 +1,9 @@
 const express = require("express");
 const cors = require("cors");
-const session = require("express-session");
-const passport = require("passport");
 require("dotenv").config();
-const { SESSION_SECRET } = require("./config");
+// const session = require("express-session");
+// const passport = require("passport");
+// const { SESSION_SECRET } = require("./config");
 const authRoutes = require("./routes/auth.js");
 
 const app = express();
@@ -24,16 +24,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-app.use(
-  session({
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+// app.use(
+//   session({
+//     secret: SESSION_SECRET,
+//     resave: false,
+//     saveUninitialized: true,
+//   })
+// );
 
-app.use(passport.initialize());
-app.use(passport.session());
+// app.use(passport.initialize());
+// app.use(passport.session());
 
 app.get("/", (req, res) => {
   res.send("Hello, World!");
