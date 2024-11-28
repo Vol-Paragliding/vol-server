@@ -17,7 +17,7 @@ const api_secret = isProduction
 const app_id = isProduction
   ? process.env.PROD_STREAM_APP_ID
   : process.env.STREAM_APP_ID;
-console.log('api_key', api_key, 'api_secret', api_secret, 'app_id', app_id)
+
 const verifyUser = async (identifier, password, cb) => {
   try {
     const sql = "SELECT * FROM users WHERE username = $1 OR email = $1";
