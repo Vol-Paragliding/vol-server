@@ -31,8 +31,8 @@ const generateTokens = async (user) => {
   );
   const refreshToken = crypto.randomBytes(40).toString("hex");
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 180);
-  console.log(`[AUTH] Generated tokens - expire:`, expiresAt);
+  expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+  console.log(`[AUTH] Generated tokens - expire:`, expiresAt.toISOString());
   const decoded = jwt.decode(accessToken);
   console.log(
     `[AUTH] Generated tokens - expiresIn:`,
@@ -49,12 +49,12 @@ const generateTokens = async (user) => {
 
 const refreshTokens = async (refreshToken) => {
   const result = await db.query(
-    "SELECT user_id FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()",
+    "SELECT user_id FROM refresh_tokens WHERE token = $1",
     [refreshToken]
   );
 
   if (result.rows.length === 0) {
-    throw new Error("Invalid or expired refresh token");
+    throw new Error("Invalid refresh token");
   }
 
   const userId = result.rows[0].user_id;
@@ -437,6 +437,7 @@ const deleteUser = async (req, res) => {
   try {
     await deleteUserActivities(userId);
     // Delete user from the feed database
+    console.log('FOOOO')
     await feedClient.user(userId).delete();
     feedSuccess = true;
   } catch (error) {
