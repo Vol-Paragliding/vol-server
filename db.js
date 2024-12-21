@@ -11,30 +11,48 @@ const pool = new Pool({
   ssl: isProduction ? { rejectUnauthorized: false } : false,
 });
 
-const createTable = async () => {
-  const queryText = `
+const createTables = async () => {
+  const queries = [
+    `
     CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    userId TEXT,
-    username TEXT UNIQUE NOT NULL,
-    hashed_password TEXT NULL,
-    salt TEXT NULL,
-    email TEXT,
-    googleId TEXT UNIQUE,
-    name TEXT,
-    profile JSONB
-  );
-  `;
-  try {
-    await pool.query(queryText);
-    console.log("Users table created or already exists.");
-  } catch (err) {
-    console.error(`Error creating users table: ${err.message}`);
+      id TEXT PRIMARY KEY,
+      userId TEXT,
+      username TEXT UNIQUE NOT NULL,
+      hashed_password TEXT NULL,
+      salt TEXT NULL,
+      email TEXT,
+      googleId TEXT UNIQUE,
+      name TEXT,
+      profile JSONB
+    );
+    `,
+    `
+    CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT fk_user
+        FOREIGN KEY(user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+    );
+    `,
+  ];
+
+  for (const queryText of queries) {
+    try {
+      await pool.query(queryText);
+      console.log("Table created or already exists.");
+    } catch (err) {
+      console.error(`Error creating table: ${err.message}`);
+    }
   }
 };
 
 const initializeDatabase = async () => {
-  await createTable();
+  await createTables();
 };
 
 initializeDatabase().catch((err) => {

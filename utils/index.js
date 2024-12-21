@@ -5,6 +5,9 @@ const db = require("../db");
 const { uploadUserImageToGCP } = require("./imageUpload");
 const deleteUserActivities = require("./deleteUserActivities");
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const { generateStreamTokens } = require("./generateStreamTokens");
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -18,6 +21,88 @@ const app_id = isProduction
   ? process.env.PROD_STREAM_APP_ID
   : process.env.STREAM_APP_ID;
 
+const generateTokens = async (user) => {
+  const accessToken = jwt.sign(
+    { user_id: user.id, username: user.username },
+    process.env.JWT_SECRET,
+    { expiresIn: "1d" }
+    // { expiresIn: "24d" }
+    // { expiresIn: "6m" }
+  );
+  const refreshToken = crypto.randomBytes(40).toString("hex");
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 180);
+  console.log(`[AUTH] Generated tokens - expire:`, expiresAt);
+  const decoded = jwt.decode(accessToken);
+  console.log(
+    `[AUTH] Generated tokens - expiresIn:`,
+    new Date(decoded.exp * 1000).toISOString()
+  );
+
+  await db.query(
+    "INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)",
+    [user.id, refreshToken, expiresAt]
+  );
+
+  return { accessToken, refreshToken };
+};
+
+const refreshTokens = async (refreshToken) => {
+  const result = await db.query(
+    "SELECT user_id FROM refresh_tokens WHERE token = $1 AND expires_at > NOW()",
+    [refreshToken]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error("Invalid or expired refresh token");
+  }
+
+  const userId = result.rows[0].user_id;
+  const userResult = await db.query("SELECT * FROM users WHERE id = $1", [
+    userId,
+  ]);
+
+  if (userResult.rows.length === 0) {
+    throw new Error("User not found");
+  }
+
+  const user = userResult.rows[0];
+  const tokens = await generateTokens(user);
+
+  const { feedToken, chatToken } = generateStreamTokens(user.id);
+  console.log(`[AUTH] Refreshed tokens for user_id: ${user.id}`);
+
+  return {
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
+    user,
+    feedToken,
+    chatToken,
+  };
+};
+
+const verifyToken = async (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "Access token is required" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res
+        .status(401)
+        .json({ message: "Token expired", code: "TOKEN_EXPIRED" });
+    }
+
+    return res.status(401).json({ message: "Invalid or expired access token" });
+  }
+};
+
 const verifyUser = async (identifier, password, cb) => {
   try {
     const sql = "SELECT * FROM users WHERE username = $1 OR email = $1";
@@ -29,22 +114,20 @@ const verifyUser = async (identifier, password, cb) => {
 
     const user = result.rows[0];
 
-    if (!user.salt || !user.hashed_password) {
+    if (!user.hashed_password) {
       return cb(
         "This account was created using Google OAuth. Please log in using Google."
       );
     }
 
-    const salt =
-      user.salt instanceof Buffer ? user.salt.toString("utf-8") : user.salt;
     const storedHashedPassword =
       user.hashed_password instanceof Buffer
         ? user.hashed_password.toString("utf-8")
         : user.hashed_password;
 
-    const generatedHashedPassword = bcrypt.hashSync(password, salt);
+    const passwordMatches = bcrypt.compareSync(password, storedHashedPassword);
 
-    if (generatedHashedPassword === storedHashedPassword) {
+    if (passwordMatches) {
       cb(null, user);
     } else {
       return cb("Incorrect Password.");
@@ -120,11 +203,13 @@ const signupHandler = async (error, result, res) => {
     return;
   }
   const { username, userId, id, name, email = "", profile } = result;
-  const feedClient = connect(api_key, api_secret, app_id, {
-    location: "us-east",
-  });
 
   try {
+    const tokens = await generateTokens({ id, username });
+
+    const feedClient = connect(api_key, api_secret, app_id, {
+      location: "us-east",
+    });
     const chatClient = StreamChat.getInstance(api_key, api_secret);
     await chatClient.upsertUser({
       id,
@@ -145,23 +230,15 @@ const signupHandler = async (error, result, res) => {
     });
 
     const userFeed = feedClient.feed("user", id);
-    // await userFeed.addActivity({
-    //   actor: user,
-    //   verb: "signup",
-    //   object: `${username} has signed up! 🎉🎉🎉`,
-    //   text: `${username} has signed up! 🎉🎉🎉`,
-    // });
-
     const timelineFeed = feedClient.feed("timeline", id);
     await timelineFeed.follow("user", id);
     const notificationFeed = feedClient.feed("notification", id);
 
-    const feedToken = feedClient.createUserToken(id);
-    const chatToken = chatClient.createToken(id);
-    console.log('feedToken', feedToken, 'chatToken', chatToken)
-    console.log('key, id, secret', api_key, id, api_secret)
+    const { feedToken, chatToken } = generateStreamTokens(id);
 
     res.status(200).json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       feedToken,
       chatToken,
       user: {
@@ -178,36 +255,24 @@ const signupHandler = async (error, result, res) => {
     if (error.code === 16) {
       res.status(409).json({ message: "Username unavailable" });
     } else {
-      res.status(500).json({ message: `Error creating user` });
+      res.status(500).json({ message: "Error creating user" });
     }
   }
 };
 
 const loginHandler = async (error, result, res) => {
   if (error) {
-    console.error("Error in loginHandler:", error);
-    res.status(400).json({ message: error });
-    return;
+    return res.status(400).json({ message: error });
   }
-  const { username, email, id, userId, name, profile } = result;
-  const feedClient = connect(api_key, api_secret, app_id, {
-    location: "us-east",
-  });
 
   try {
-    const chatClient = StreamChat.getInstance(api_key, api_secret);
-    const { users } = await chatClient.queryUsers({
-      id: { $eq: id },
-    });
-    if (!users.length) {
-      console.log("User not found");
-      return res.status(400).json({ message: "User not found" });
-    }
-
-    const chatToken = chatClient.createToken(id);
-    const feedToken = feedClient.createUserToken(id);
+    const { username, email, id, userId, name, profile } = result;
+    const tokens = await generateTokens({ id, username });
+    const { feedToken, chatToken } = generateStreamTokens(id);
 
     res.status(200).json({
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
       feedToken,
       chatToken,
       user: {
@@ -221,9 +286,7 @@ const loginHandler = async (error, result, res) => {
     });
   } catch (error) {
     console.error("Error in loginHandler:", error);
-    res
-      .status(500)
-      .json({ message: "An unexpected error occurred. Please try agin later" });
+    res.status(500).json({ message: "An unexpected error occurred" });
   }
 };
 
@@ -468,4 +531,7 @@ module.exports = {
   searchUsers,
   deleteUser,
   getUsers,
+  refreshTokens,
+  verifyToken,
+  generateTokens,
 };

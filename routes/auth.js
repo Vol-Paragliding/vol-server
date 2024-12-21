@@ -3,13 +3,20 @@ const { OAuth2Client } = require("google-auth-library");
 const multer = require("multer");
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
-const { getUsers } = require("../utils");
+const {
+  getUsers,
+  refreshTokens,
+  verifyToken,
+  generateTokens,
+} = require("../utils");
 const { uploadUserImageToGCP } = require("../utils/imageUpload");
 const {
   saveResetTokenToDatabase,
   sendRecoveryEmail,
 } = require("../utils/accountRecovery");
+const { generateStreamTokens } = require("../utils/generateStreamTokens");
 const db = require("../db");
 const {
   signup,
@@ -25,19 +32,50 @@ const upload = multer();
 const router = express.Router();
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-router.post("/check-user", async (req, res) => {
-  const { userId } = req.body;
+router.post("/validate-authToken", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+
+  if (!token) return res.status(401).json({ message: "Token missing" });
 
   try {
-    const user = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
-    if (user.rows.length === 0) {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.user_id;
+
+    const userResult = await db.query("SELECT * FROM users WHERE id = $1", [
+      userId,
+    ]);
+    if (userResult.rows.length === 0) {
       return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ user: user.rows[0] });
-  } catch (err) {
-    res.status(500).json({ message: "Error checking user" });
+
+    const user = userResult.rows[0];
+
+    const { accessToken, refreshToken } = await generateTokens(user);
+    const { feedToken, chatToken } = generateStreamTokens(user.id);
+
+    res.status(200).json({
+      accessToken,
+      refreshToken,
+      feedToken,
+      chatToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        profile: user.profile,
+      },
+    });
+  } catch (error) {
+    console.error("Token validation error:", error);
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ message: "Token expired" });
+    }
+    res.status(401).json({ message: "Invalid token" });
   }
 });
+
+router.post("/signup", signup);
+router.post("/login", login);
 
 router.post("/google", async (req, res) => {
   const { tokenId } = req.body;
@@ -52,6 +90,9 @@ router.post("/google", async (req, res) => {
     await findOrCreateUser({ googleId, email, name, profileImage }, res);
   } catch (error) {
     console.error("Google login error:", error);
+    if (error.response && error.response.data) {
+      return res.status(401).json({ message: error.response.data.error });
+    }
     res.status(401).json({ message: "Google authentication failed" });
   }
 });
@@ -81,84 +122,21 @@ router.post("/check-availability", async (req, res) => {
   }
 });
 
-router.post("/get-username-by-id", async (req, res) => {
-  const { userId } = req.body;
+router.post("/refresh-token", async (req, res) => {
+  const { refreshToken } = req.body;
 
-  try {
-    const result = await db.query("SELECT username FROM users WHERE id = $1", [
-      userId,
-    ]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    const username = result.rows[0].username;
-    res.status(200).json({ username });
-  } catch (error) {
-    console.error("Error fetching username:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/get-user-id", async (req, res) => {
-  const { username } = req.body;
-
-  try {
-    const sql = "SELECT id FROM users WHERE username = $1";
-    const result = await db.query(sql, [username]);
-
-    const userId = result.rows.length > 0 ? result.rows[0].id : null;
-
-    if (userId === null) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.status(200).json({ userId });
-  } catch (error) {
-    console.error("Error fetching user ID:", error);
-    res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-router.post("/update-profile", async (req, res) => {
-  const { id, ...updates } = req.body;
-
-  if (!id) {
-    return res.status(400).json({ message: "User ID is required" });
+  if (!refreshToken) {
+    return res.status(400).json({ message: "Refresh token is required" });
   }
 
   try {
-    const result = await updateProfile(id, updates);
+    const result = await refreshTokens(refreshToken);
     res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ message: "Error updating profile" });
+    console.error("Token refresh error:", error);
+    res.status(401).json({ message: error.message });
   }
 });
-
-router.post(
-  "/update-profile-image",
-  upload.single("image"),
-  async (req, res) => {
-    const { userId } = req.body;
-    const imageFile = req.file;
-
-    if (!userId || !imageFile) {
-      return res
-        .status(400)
-        .json({ message: "User ID and image file are required" });
-    }
-
-    try {
-      const imageUrl = await uploadUserImageToGCP(imageFile, userId);
-
-      res.status(200).json({ imageUrl });
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      res.status(500).json({ message: "Error uploading image" });
-    }
-  }
-);
 
 router.post("/forgot-password", async (req, res) => {
   const { email } = req.body;
@@ -232,6 +210,109 @@ router.post("/reset-password", async (req, res) => {
   }
 });
 
+router.use(verifyToken);
+
+router.post("/check-user", async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const user = await db.query("SELECT * FROM users WHERE id = $1", [userId]);
+    if (user.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json({ user: user.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: "Error checking user" });
+  }
+});
+
+router.post("/get-username-by-id", async (req, res) => {
+  const { userId } = req.body;
+
+  try {
+    const result = await db.query("SELECT username FROM users WHERE id = $1", [
+      userId,
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const username = result.rows[0].username;
+    res.status(200).json({ username });
+  } catch (error) {
+    console.error("Error fetching username:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/get-user-id", async (req, res) => {
+  const { username } = req.body;
+
+  if (!username || typeof username !== "string") {
+    return res.status(400).json({ message: "Invalid username format" });
+  }
+
+  try {
+    const sql = "SELECT id FROM users WHERE username = $1";
+    const result = await db.query(sql, [username]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({ userId: result.rows[0].id });
+  } catch (error) {
+    console.error("Error fetching user ID:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/update-profile", async (req, res) => {
+  try {
+    const { id, ...updates } = req.body;
+
+    if (req.user.user_id !== id) {
+      return res.status(403).json({ message: "Unauthorized action" });
+    }
+
+    const result = await updateProfile(id, updates);
+    res.status(200).json(result);
+  } catch (error) {
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        message: "Token expired",
+        code: "TOKEN_EXPIRED",
+      });
+    }
+    res.status(500).json({ message: "Error updating profile" });
+  }
+});
+
+router.post(
+  "/update-profile-image",
+  upload.single("image"),
+  async (req, res) => {
+    const { userId } = req.body;
+    const imageFile = req.file;
+
+    if (!userId || !imageFile) {
+      return res
+        .status(400)
+        .json({ message: "User ID and image file are required" });
+    }
+
+    try {
+      const imageUrl = await uploadUserImageToGCP(imageFile, userId);
+
+      res.status(200).json({ imageUrl });
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      res.status(500).json({ message: "Error uploading image" });
+    }
+  }
+);
+
 // TODO: test this route
 router.get("/users", async (req, res) => {
   const { offset = 0, limit = 10, searchTerm = "" } = req.query;
@@ -244,13 +325,27 @@ router.get("/users", async (req, res) => {
   }
 });
 
-router.get("/logout", (req, res) => {
-  req.logout();
-  res.redirect("/");
+router.post("/logout", async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (refreshToken) {
+    try {
+      const result = await db.query(
+        "DELETE FROM refresh_tokens WHERE token = $1",
+        [refreshToken]
+      );
+
+      if (result.rowCount === 0) {
+        console.warn("Attempted to delete non-existent refresh token.");
+      }
+    } catch (error) {
+      console.error("Error during logout:", error);
+    }
+  }
+
+  res.status(200).json({ message: "Logged out successfully" });
 });
 
-router.post("/signup", signup);
-router.post("/login", login);
 router.post("/users", users);
 router.delete("/user/:userId", deleteUser);
 
