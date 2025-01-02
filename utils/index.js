@@ -308,29 +308,27 @@ const loginHandler = async (error, result, res) => {
       { id: "general-chat", name: "General Chat" },
     ];
 
-    try {
-      for (const channel of channelNames) {
-        const { id: channelId } = channel;
+    for (const channel of channelNames) {
+      const { id: channelId } = channel;
 
-        const currentChannel = chatClient.channel("messaging", channelId);
+      const currentChannel = chatClient.channel("messaging", channelId);
+      const membersQuery = await currentChannel.queryMembers({
+        id: { $eq: id },
+      });
 
-        const membersQuery = await currentChannel.queryMembers({
-          id: { $eq: userId },
+      if (membersQuery.members.length === 0) {
+        await currentChannel.addMembers([id]).catch((err) => {
+          console.error(
+            `Failed to add user ${id} to channel ${channelId}:`,
+            err
+          );
         });
-
-        if (membersQuery.members.length === 0) {
-          await currentChannel.addMembers([userId]);
-          console.log(
-            `[LOGIN] Added user_id: ${userId} to channel: ${channelId}`
-          );
-        } else {
-          console.log(
-            `[LOGIN] User_id: ${userId} is already a member of ${channelId}`
-          );
-        }
+        console.log(`[LOGIN] Added user.id: ${id} to channel: ${channelId}`);
+      } else {
+        console.log(
+          `[LOGIN] user.id: ${id} is already a member of ${channelId}`
+        );
       }
-    } catch (error) {
-      console.error("Error adding user to channels during login:", error);
     }
 
     res.status(200).json({
