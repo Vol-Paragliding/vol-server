@@ -220,6 +220,35 @@ const signupHandler = async (error, result, res) => {
       profile,
     });
 
+    const channelNames = [
+      { id: "boulder", name: "Boulder" },
+      { id: "lookout", name: "Lookout" },
+      { id: "summit-county", name: "Summit County" },
+      { id: "general-chat", name: "General Chat" },
+    ];
+
+    try {
+      for (const channel of channelNames) {
+        const { id: channelId, name: channelName } = channel;
+
+        const currentChannel = chatClient.channel("messaging", channelId, {
+          name: channelName,
+          created_by_id: "zacheryconverse",
+        });
+
+        await currentChannel.create().catch((err) => {
+          if (!/already exists/.test(err.message)) throw err;
+        });
+
+        await currentChannel.addMembers([userId]);
+        console.log(
+          `[AUTH] Added user_id: ${userId} to channel: ${channelName}`
+        );
+      }
+    } catch (error) {
+      console.error("Error creating or adding user to channels:", error);
+    }
+
     const user = await feedClient.user(id).create({
       id,
       userId,
@@ -269,6 +298,40 @@ const loginHandler = async (error, result, res) => {
     const { username, email, id, userId, name, profile } = result;
     const tokens = await generateTokens({ id, username });
     const { feedToken, chatToken } = generateStreamTokens(id);
+
+    const chatClient = StreamChat.getInstance(api_key, api_secret);
+
+    const channelNames = [
+      { id: "boulder", name: "Boulder" },
+      { id: "lookout", name: "Lookout" },
+      { id: "summit-county", name: "Summit County" },
+      { id: "general-chat", name: "General Chat" },
+    ];
+
+    try {
+      for (const channel of channelNames) {
+        const { id: channelId } = channel;
+
+        const currentChannel = chatClient.channel("messaging", channelId);
+
+        const membersQuery = await currentChannel.queryMembers({
+          id: { $eq: userId },
+        });
+
+        if (membersQuery.members.length === 0) {
+          await currentChannel.addMembers([userId]);
+          console.log(
+            `[LOGIN] Added user_id: ${userId} to channel: ${channelId}`
+          );
+        } else {
+          console.log(
+            `[LOGIN] User_id: ${userId} is already a member of ${channelId}`
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Error adding user to channels during login:", error);
+    }
 
     res.status(200).json({
       accessToken: tokens.accessToken,
@@ -437,7 +500,6 @@ const deleteUser = async (req, res) => {
   try {
     await deleteUserActivities(userId);
     // Delete user from the feed database
-    console.log('FOOOO')
     await feedClient.user(userId).delete();
     feedSuccess = true;
   } catch (error) {
