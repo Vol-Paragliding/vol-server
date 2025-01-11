@@ -20,17 +20,17 @@ const PORT = process.env.PORT || 8080;
 //     credentials: true, // Allow cookies and authentication headers
 //   })
 // );
-// app.use(
-//   cors({
-//     origin: [
-//       "https://volflights.com",
-//       "https://vol.flights",
-//       "http://localhost:3000",
-//     ],
-//     methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-//     credentials: true,
-//   })
-// );
+app.use(
+  cors({
+    origin: [
+      "https://volflights.com",
+      "https://vol.flights",
+      "http://localhost:3000",
+    ],
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
