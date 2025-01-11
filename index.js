@@ -9,7 +9,7 @@ const authRoutes = require("./routes/auth.js");
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// app.use(cors());
+app.use(cors()); // comment this out for mobile dev?
 // app.use(
 //   cors({
 //     origin: [
@@ -51,6 +51,5 @@ app.get("/", (req, res) => {
 
 app.use("/auth", authRoutes);
 
-app.listen(8080, "0.0.0.0", () => console.log(`Server running on port 8080`));
-// app.listen(8080, '192.168.68.26', () => console.log(`Server running on port 8080`));
-// app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// app.listen(8080, "0.0.0.0", () => console.log(`Server running on port 8080`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
